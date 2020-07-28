@@ -41,14 +41,14 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   if (!is.null(saveSROBJdir)) dir.create(saveSROBJdir, showWarnings = F, recursive = T)
   if (!is.null(figdir)) dir.create(figdir, showWarnings = F, recursive = T)
   if (!is.null(SaveEndNamesDir) & tier==0) dir.create(SaveEndNamesDir, showWarnings = F, recursive = T)
-  SaveEndFileName <- paste0(SaveEndFileName, sprintf("T%sC%s", tier, clustN), sep=".")
+  SaveEndFileName <- paste0(SaveEndFileName, sprintf("_T%sC%s", tier, clustN))
 
   ######################################################################################################
   #' make sure QC metadata exists
   ######################################################################################################
   if (is.null(srobj@meta.data$nFeature_RNA) & tier == 0) {srobj$nFeature_RNA <- Matrix::colSums(srobj@assays$RNA@counts > 0)}
   if (is.null(srobj@meta.data$nCount_RNA) & tier == 0) {srobj$nCount_RNA <- Matrix::colSums(srobj@assays$RNA@counts)}
-  if (is.null(srobj@meta.data$percent.mt) & tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-")}
+  if (is.null(srobj@meta.data$percent.mt) & tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-", assay="RNA")}
 
   ######################################################################################################
   #' basic processing
@@ -115,7 +115,9 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     Idents(working_srobj) <- old.idents
 
     #' basic umap of clusters (using umap-learn, as only it is allowed on premade graphs)
-    working_srobj <- RunUMAP(working_srobj, graph=paste0(cluster_assay, "_snn"), umap.method="umap-learn")
+    working_srobj <- RunUMAP(working_srobj,
+                             dims=working_srobj@misc$nPCs, 
+                             n.neighbors = min(30L, ncol(working_srobj)-1))
     DimPlot(working_srobj, reduction = "umap", label = T)
     ggsave(sprintf("%s/cluster_umap.pdf", figdir))
 
@@ -195,7 +197,6 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 
 
 #' old method for preprocessing seurat object
-#'
 #' Not used
 #'
 #' @param srobj seurat object
@@ -204,7 +205,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 #' @param figdir where to save QC Plots
 #' @return preprocessed seurat object in RNA assay
 #' @export
-PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, figdir=NULL) {
+PreProcess_stdV2 <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, figdir=NULL) {
   #' seurat v3 processing
   srobj <- NormalizeData(object = srobj)
   srobj <- ChooseHVG_fun(srobj)
@@ -227,13 +228,13 @@ PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun =
 #' @export
 PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, figdir=NULL) {
   #' seurat v3 processing
-  srobj <- SCTransform(object = srobj)
+  srobj <- SCTransform(object = srobj, verbose=FALSE)
   srobj <- NormalizeData(srobj, assay = "RNA")
   srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
   nPCs  <- ChoosePCs_fun(srobj, figdir=figdir)
   srobj@misc$nPCs <- nPCs
   message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
-  srobj <- FindNeighbors(object = srobj, dims=nPCs, k.param=ceiling(0.5*sqrt(ncol(srobj.tmp))))
+  srobj <- FindNeighbors(object = srobj, k.param=ceiling(0.5*sqrt(ncol(srobj))), dims=nPCs)
   return(srobj)
 }
 
@@ -322,15 +323,13 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
 #' @param nDownregulated threshold number of genes down regulated for clusters to be called different
 #' @return bool whether two clusters have differential gene expression between them
 #' @export
-EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 25, nDownregulated = 25) {
-  markers <- markers.binom(srobj, ident1, ident2)
+EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 5, nDownregulated = 5) {
+  markers <- FindMarkers(srobj, ident.1=ident1, ident.2=ident2)
   sig.markers <- markers[
-    which((abs(markers$log.effect) >= 1.5) &
-            (markers$fdr < 0.05) &
-            (markers$posFrac0 >= .2 | markers$posFrac1 >= .2)), ]
+    which((abs(markers$avg_logFC) >= 1.5) & (markers$p_val_adj < 0.05)), ]
 
-  return((sum(sig.markers$log.effect > 0) > nUpregulated) &
-           (sum(sig.markers$log.effect < 0) > nDownregulated))
+  return((sum(sig.markers$avg_logFC > 0) > nUpregulated) & 
+           (sum(sig.markers$avg_logFC < 0) > nDownregulated))
 }
 
 #' How to determine of tiered clustering should stop
@@ -343,7 +342,7 @@ EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 25, nDownregulat
 BaseCondition_default <- function(srobj, min_cluster_size=100, max_tiers=10) {
 
   #' if min cells or max tiers: stop
-  if ( (ncol(srobj) < min_cluster_size) | (srobj@misc$tier >= max_tiers) ) {
+  if ( (ncol(srobj) < min_cluster_size) | (srobj@misc$tier > max_tiers) ) {
     message("found end state with min number of cells")
     return(1)
   }
@@ -542,8 +541,8 @@ ChooseClusterResolutionDownsample <- function(
   return(input.srobj)
 }
 
-
-#'  Binomial signifcance test for on/off gene expression
+#' DEPRICATED
+#' Binomial signifcance test for on/off gene expression
 #'
 #' #######################################################################################################
 #' Gratefully stolen from:
