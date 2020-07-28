@@ -5,7 +5,7 @@ resolution parameters at each stage of clustering. Outputs QC plots for each tie
 can return output directories figs/ srobjs/ (see examples) containing subset 
 seurat objects and QC plots matching tiered structure of found in dataset
 can also return endclusts/ folder which contains tsv files named with the 
-path to the endcluster (T0C0.T1C1.tsv) and contains the cellnames (one per line) 
+path to the endcluster (T0C0_T1C1.tsv) and contains the cellnames (one per line) 
 that comprise that cluster
 
 ## Install
@@ -48,18 +48,18 @@ based on the hetrogeneity of your data.
 
 ## Params
 
-* srobj v3 seurat object
-* cluster_assay assay to use for clustering defaults to "SCT"
-* cells cellnames if tiered clustering should start on subset of object
-* tier starting level defaults to 0
-* clustN cluster starting from default to 0
-* PreProcess_fun function to use for preproccessing defaults to PreProcess_sctransform
-* BaseCondition_fun function to determine if clustering should continue to recurse
-* ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
-* saveSROBJdir where to save seurat objects for each tier and cluster, if null does not save
-* figdir where to save QC figures for each tier and cluster, if null does not save
-* saveEndNamesDir where to save directory of end clusters, if null does not save
-* SaveEndFileName prefix for all end cluster files
+* *srobj* v3 seurat object
+* *cluster_assay* assay to use for clustering defaults to "SCT"
+* *cells* cellnames if tiered clustering should start on subset of object
+* *tier* starting level defaults to 0
+* *clustN* cluster starting from default to 0
+* *PreProcess_fun* function to use for preproccessing defaults to PreProcess_sctransform
+* *BaseCondition_fun* function to determine if clustering should continue to recurse
+* *ChooseOptimalClustering_fun* function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
+* *saveSROBJdir* where to save seurat objects for each tier and cluster, if null does not save
+* *figdir* where to save QC figures for each tier and cluster, if null does not save
+* *saveEndNamesDir* where to save directory of end clusters, if null does not save
+* *SaveEndFileName* prefix for all end cluster files
 
 ## Returns
 
