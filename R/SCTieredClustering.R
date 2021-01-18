@@ -1,6 +1,10 @@
+#! /usr/bin/Rscript
 require(Seurat)
-require(parallel)
 require(tidyverse)
+require(devtools)
+require(data.table)
+library(glmGamPoi)
+library(parallel)
 
 #' Performs Iterative clustering of a v3 Seurat object
 #'
@@ -12,9 +16,9 @@ require(tidyverse)
 #'
 #' @examples srobj <- readRDS("/path/to/seurat_object.rds")
 #' tiers <- GenTieredclusters(srobj,
-#'                            saveSROBJdir = "~/teiredoutput/srobjs",
-#'                            figdir = "~/teiredoutput/figdir",
-#'                            SaveEndNamesDir = "~/teiredoutput/endclusts")
+#'                            saveSROBJdir = "~/tieredoutput/srobjs",
+#'                            figdir = "~/tieredoutput/figdir",
+#'                            SaveEndNamesDir = "~/tieredoutput/endclusts")
 #'
 #' @param srobj v3 seurat object
 #' @param cluster_assay assay to use for clustering defaults to "SCT"
@@ -22,7 +26,6 @@ require(tidyverse)
 #' @param tier starting level defaults to 0
 #' @param clustN cluster starting from default to 0
 #' @param PreProcess_fun function to use for preproccessing defaults to PreProcess_sctransform
-#' @param BaseCondition_fun function to determine if clustering should continue to recurse
 #' @param ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
 #' @param saveSROBJdir where to save seurat objects for each tier and cluster, if null does not save
 #' @param figdir where to save QC figures for each tier and cluster, if null does not save
@@ -30,29 +33,31 @@ require(tidyverse)
 #' @param SaveEndFileName prefix for all end cluster files
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
+
+
 GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
                               PreProcess_fun = PreProcess_sctransform,
-                              BaseCondition_fun = BaseCondition_default,
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
-                              saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL) {
+                              saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
+                              min_cluster_size = 100, max_tiers = 10) {
   ######################################################################################################
   #' make sure output directories exist
   ######################################################################################################
-  if (!is.null(saveSROBJdir)) dir.create(saveSROBJdir, showWarnings = F, recursive = T)
-  if (!is.null(figdir)) dir.create(figdir, showWarnings = F, recursive = T)
-  if (!is.null(SaveEndNamesDir) & tier==0) dir.create(SaveEndNamesDir, showWarnings = F, recursive = T)
+  if (!is.null(saveSROBJdir)) dir.create(saveSROBJdir, showWarnings = T, recursive = T)
+  if (!is.null(figdir)) dir.create(figdir, showWarnings = T, recursive = T)
+  if (!is.null(SaveEndNamesDir) & tier==0) dir.create(SaveEndNamesDir, showWarnings = T, recursive = T)
   SaveEndFileName <- paste0(SaveEndFileName, sprintf("_T%sC%s", tier, clustN))
-
+  
   ######################################################################################################
   #' make sure QC metadata exists
   ######################################################################################################
   if (is.null(srobj@meta.data$nFeature_RNA) & tier == 0) {srobj$nFeature_RNA <- Matrix::colSums(srobj@assays$RNA@counts > 0)}
   if (is.null(srobj@meta.data$nCount_RNA) & tier == 0) {srobj$nCount_RNA <- Matrix::colSums(srobj@assays$RNA@counts)}
-  if (is.null(srobj@meta.data$percent.mt) & tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-", assay="RNA")}
+  if (is.null(srobj@meta.data$percent.mt) & tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-")}
 
   ######################################################################################################
   #' basic processing
-  ######################################################################################################
+  ###################################################################################################### 
   #' subset to provided cells
   if (is.null(cells)) {
     cells <- colnames(srobj)
@@ -60,121 +65,106 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   working_srobj <- subset(srobj, cells=cells)
   working_srobj@misc$tier <- tier
 
-  #' keep track of posistion in tree for logging
+  ######################################################################################################
+
+  #' keep track of position in tree for logging
+  message("Number of cells: ",paste0(ncol(working_srobj),collapse='\n'))
   message(paste0("Starting tier: ", tier, ", cluster: ", clustN, ", with ", ncol(working_srobj), " cells" ))
+  message(paste0("file name: ", sprintf("%s/%s.tsv", SaveEndNamesDir, SaveEndFileName)))
 
-  #' preprocess
-  working_srobj <- PreProcess_fun(working_srobj, figdir=figdir)
+  #' Basic QC plotting of end-nodes before interruption of recursion
+  QC_Plotting(working_srobj, fig_dir = figdir)
+  
+  ######################################################################################################
+  #' check if too few cells or past tier 10. if so, return end-node without processing
+  ######################################################################################################
 
-  #' get optimum cluster res and clusters
-  res <- ChooseOptimalClustering_fun(working_srobj,
+  if ( (ncol(working_srobj) < min_cluster_size) | (working_srobj@misc$tier > max_tiers) ) {
+    message(cbind("found end-node below min number of cells or above max tier. num cells: ", ncol(working_srobj),' < ', min_cluster_size))
+    #write end-node table and srobj
+    EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
+    #stop recursion
+    return(working_srobj)
+  }
+  
+  #' Preprocessing: Run SCtransform or log transform, PCA, choose num PCs for downstream analysis, find neighbors.
+
+  tryCatch({working_srobj <- PreProcess_fun(working_srobj, fig_dir=figdir)
+          },
+          error = function(e) {message('Pre-processing failure'); print(paste("Pre-processing error: ", e))
+        })
+  
+  #' Get optimum cluster resolution and cluster
+
+  tryCatch({res <- ChooseOptimalClustering_fun(working_srobj,
                                      assay=cluster_assay,
                                      PreProcess_fun = PreProcess_fun,
                                      downsample_num = 7500,
                                      figdir=figdir)
-  working_srobj <- FindClusters(working_srobj,
+            },
+            error = function(e) {message('Resolution choice failure'); print(paste("Resolution choice error: ", e))
+          })
+  tryCatch({working_srobj <- FindClusters(working_srobj,
                                 assay = cluster_assay,
                                 resolution = res,
                                 k.param=ceiling(0.5*sqrt(ncol(working_srobj))))
+            },
+            error = function(e) {message('FindClusters failure'); print(paste("Clustering error: ", e))
+          })
+  
   ######################################################################################################
-  #' base conditions
-  ######################################################################################################
-  # 0 = not reached, 1 = too few cells, 2 = only one cluster, 3 = 2 indistinguishable clusters
-  reached_base_condition <- BaseCondition_fun(working_srobj)
+  #' logging & plotting: pre-processing and cluster results
+  ###################################################################################################### 
 
-  ######################################################################################################
-  #' logging & plotting
-  ######################################################################################################
-  cell.num.per.clust <- table(Idents(working_srobj))
-  message("Cell counts per cluster")
-  print(cell.num.per.clust)
-
-  if (!is.null(figdir)) {
-
-    #' save basic cell counts
-    cat(sprintf("Srobj: with %s genes & %s cells", nrow(working_srobj), ncol(working_srobj)),
-        file = sprintf("%s/basic_counts.txt", figdir), sep="\n")
-    cat(sprintf("\n Choose %s PCs \n", working_srobj@misc$nPCs), file = sprintf("%s/basic_counts.txt", figdir), append = T)
-    cat("\nTable of num cells per cluster:\n", file = sprintf("%s/basic_counts.txt", figdir), append = T)
-    write.table(cell.num.per.clust, file = sprintf("%s/basic_counts.txt", figdir), row.names = F, append = T)
-
-    #' violin plot of nFeature, nCount, & percent mito
-    old.idents <- Idents(working_srobj)
-    Idents(working_srobj) <- rep("all.data", ncol(working_srobj))
-
-    VlnPlot(working_srobj, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = -1)
-    ggsave(sprintf("%s/QC_vln_plot.pdf", figdir))
-
-    #' basic QC scatter plots
-    FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "percent.mt")
-    ggsave(sprintf("%s/QC_scatter_plot_nCount_pctMito.pdf", figdir))
-    FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-    ggsave(sprintf("%s/QC_scatter_plot_nCount_nFeat.pdf", figdir))
-
-    #' set idents back to clusters
-    Idents(working_srobj) <- old.idents
-
-    #' basic umap of clusters (using umap-learn, as only it is allowed on premade graphs)
-    working_srobj <- RunUMAP(working_srobj,
-                             dims=working_srobj@misc$nPCs, 
-                             n.neighbors = min(30L, ncol(working_srobj)-1))
-    DimPlot(working_srobj, reduction = "umap", label = T)
-    ggsave(sprintf("%s/cluster_umap.pdf", figdir))
-
-    if (!is.null(working_srobj@meta.data$orig.ident)) {
-      DimPlot(working_srobj, group.by = "orig.ident", reduction = "umap", label = F)
-      ggsave(sprintf("%s/orig_ident_umap.pdf", figdir))
-    }
-    #   DimPlot(working_srobj, group.by = "smp_id", reduction = "umap", label = T)
-    #   DimPlot(working_srobj, group.by = "inflammation", reduction = "umap", label = T)
-
-    markers <- FindAllMarkers(working_srobj, assay = "RNA", only.pos = T, max.cells.per.ident = 2000)
-    if ( !(nrow(markers) < 1) ) {
-      top10markers <- markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05) %>%  top_n(10, avg_logFC)
-      write.table(top10markers, sprintf("%s/top10markers.tsv", figdir), sep="\t", row.names = F)
-      write.table(markers, sprintf("%s/allmarkers.tsv", figdir), sep="\t", row.names = F)
-
-      #' output heatmap of markers
-      if (nrow(top10markers) < 5) {top10markers <- markers %>% group_by(cluster) %>% top_n(10, avg_logFC)}
-      tryCatch({
-        working_srobj <- ScaleData(working_srobj, features = top10markers$gene)
-        DoHeatmap(working_srobj, features = top10markers$gene, raster = F)
-        ggsave(sprintf("%s/top10markers_heatmap.pdf", figdir))
-      }, error = function(e) {message("Failed to produce heatmap"); print(paste("HEATMAP ERRORED ON:  ", e))})
-    }
-  }
-  if (!is.null(saveSROBJdir)) {
-    if (reached_base_condition == 3) # merge final two clusters
-    {
-      Idents(working_srobj) <- 0
-      working_srobj$two_not_quite_clusters <- working_srobj$seurat_clusters
-      working_srobj$seurat_clusters <- 0
-    }
-    message(paste("saving srobj to", saveSROBJdir))
-    saveRDS(working_srobj, sprintf("%s/subset_srobj.rds", saveSROBJdir))
-  }
-
+  tryCatch({working_srobj <- Plotting(working_srobj, fig_dir = figdir)
+  },
+  error = function(e) {message('Plotting failure'); print(paste("Plotting error: ", e))
+  })
 
   ######################################################################################################
-  #' setup and recurse
+  #' check if too few clusters to call end-node and end recursion
   ######################################################################################################
 
-  #' how to stop
-  if (reached_base_condition > 0) {
-    if (!is.null(SaveEndNamesDir)) {
-      write.table(as.matrix(colnames(working_srobj)),
-                  sprintf("%s/%s.tsv", SaveEndNamesDir, SaveEndFileName),
-                  sep="\t", row.names = F, col.names = F)
-    }
+  #' if one cluster:
+  if ( !(length(unique(Idents(working_srobj))) > 1) ) {
+    #write end-node table and srobj
+    EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
+    
+    message("found end state with one cluster")
     return(working_srobj)
   }
 
+  #' if two indistinguishable clusters, defined by differential expression analysis
+
+  if ( (length(unique(Idents(working_srobj))) == 2) ) {
+    if ( !(EnoughDiffExp(working_srobj, levels(Idents(working_srobj))[1], levels(Idents(working_srobj))[2])) ) {
+      message("found end state with two indistinguishable clusters")
+      
+      Idents(working_srobj) <- 0
+      working_srobj$two_not_quite_clusters <- working_srobj$seurat_clusters
+      working_srobj$seurat_clusters <- 0
+
+      #write end-node table and srobj
+      EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
+
+      return(working_srobj)
+    }
+  }
+
+  #Write srobj of internal node
+  Node_Write(working_srobj, srobj_dir = saveSROBJdir)
+
+  ######################################################################################################
+  #' recurse
+  ######################################################################################################
 
   #' split all clusters into separate srobjs
   message("continuing to recurse")
+
   subsets <- SplitSrobjOnIdents(working_srobj, paste0("tier", tier))
+
   print(subsets)
-  #' we haven't reached a base condition continue
+  #' recurse along subsets
   return(lapply(seq_along(subsets),
                 function(i) {
                   if (!is.null(saveSROBJdir)) {
@@ -195,83 +185,100 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 }
 
 
-
-#' old method for preprocessing seurat object
-#' Not used
-#'
-#' @param srobj seurat object
-#' @param ChoosePCs_fun function that chooses PCs
-#' @param ChooseHVG_fun function that selects highly variable genes
-#' @param figdir where to save QC Plots
-#' @return preprocessed seurat object in RNA assay
-#' @export
-PreProcess_stdV2 <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, figdir=NULL) {
+PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, fig_dir=NULL) {
   #' seurat v3 processing
   srobj <- NormalizeData(object = srobj)
   srobj <- ChooseHVG_fun(srobj)
   srobj <- ScaleData(object = srobj, features=VariableFeatures(srobj))
   srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
-  nPCs  <- ChoosePCs_fun(srobj, figdir=figdir)
+  nPCs  <- ChoosePCs_fun(srobj, fig_dir=figdir)
   srobj@misc$nPCs <- nPCs
   message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
   srobj <- FindNeighbors(object = srobj, dims=nPCs)
   return(srobj)
 }
 
-
-#' preprocess seurat object using SCTransform
-#'
-#' @param srobj seurat object
-#' @param ChoosePCs_fun function that chooses PCs
-#' @param figdir where to save QC Plots
-#' @return preprocessed seurat object, default assay is SCT, also has normalized RNA assay
-#' @export
-PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, figdir=NULL) {
+PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig_dir=NULL) {
   #' seurat v3 processing
-  srobj <- SCTransform(object = srobj, verbose=FALSE)
+  
+  # Can be used if PCA is precalculated for the whole dataset
+  #assign("first_pass", "0", envir = .GlobalEnv)
+  #if (first_pass == "0") { 
+  #assign("first_pass", "1", envir = .GlobalEnv)
+  #} else {
+  #srobj <- SCTransform(object = srobj, verbose=TRUE)
+  #srobj <- NormalizeData(srobj, assay = "RNA")
+  #srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
+  #}
+  tryCatch({
+            srobj <- SCTransform(object = srobj, verbose=TRUE, method='glmGamPoi')
+           }, error=function(e) 
+           {message(sprintf('SCTransform failed to run, likely due to too few cells. cell num: %s .... Defaulting back to log1p normalization',ncol(srobj)))
+           })
+  
+  #If it fails, normalization defaults back to log1p
   srobj <- NormalizeData(srobj, assay = "RNA")
+  #Add ScaleData slot for regular normalization, as it may be called in downstream functions
+  srobj <- ScaleData(srobj, assay = "RNA")
+  #Additionally FindVariableFeatures to allow PCA
+  srobj <- FindVariableFeatures(srobj, assay="RNA")
+  tryCatch({
+    message(sprintf('dimensions of SCT matrix: %s', paste0(capture.output(dim(srobj[["SCT"]]@scale.data)),collapse='\n')
+      ))
+  }, error = function(e)
+  {message('skipping SCT metrics..')
+  })
+
   srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
-  nPCs  <- ChoosePCs_fun(srobj, figdir=figdir)
+
+  nPCs  <- ChoosePCs_fun(srobj, fig_dir=figdir)
   srobj@misc$nPCs <- nPCs
   message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
-  srobj <- FindNeighbors(object = srobj, k.param=ceiling(0.5*sqrt(ncol(srobj))), dims=nPCs)
+  srobj <- FindNeighbors(object = srobj, dims=nPCs)
   return(srobj)
 }
 
-#' Chooses PCs to use for downstream clustering and visualization
-#'
-#' if n cells > 500 calculates from elbow plot cumulative diffs in PC variances, selects upto deepest PC from list of differences in variances
-#'    emulates selecting from elbow plot manually, Looking for dips in explained variance and selecting at that threshold
-#' if n cells < 500 selects significant PCs from Jackstraw
-#' if two methods above don't find any PCs selects first two PCs
-#'
-#' @param srobj seurat object
-#' @param improved_diff_quantile lower bound of how many PCs to include after caclulating cumlative difference of variances
-#' @param significance significance threshold for JackStraw
-#' @param figdir where to save QC plots
-#' @return vector of indexs for PCs to use (1:n)
-#' @export
-ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.01, figdir=NULL) {
-  #' if num cells big use elbow plot if small use jackstraw,
+ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.01, fig_dir=NULL) {
+  #' if num cells big use elbow plot if small use jackstraw, 
   #'   if none sig use first 2 pcs
+
   if (ncol(srobj) > 500) {
     eigValues <- (srobj@reductions$pca@stdev)^2  ## EigenValues
     varExplained <- eigValues / sum(eigValues)
     nPCs <- 1:max(which(diff(varExplained) < quantile(diff(varExplained), 1-improved_diff_quantile)) + 1)
-    if (!is.null(figdir)) {
-      ElbowPlot(srobj, ndims=ncol(srobj@reductions$pca@cell.embeddings)) +
+    if (!is.null(fig_dir)) {
+      ElbowPlot(srobj, ndims=ncol(srobj@reductions$pca@cell.embeddings)) + 
         geom_vline(xintercept  = length(nPCs), color="red")
-      ggsave(sprintf("%s/ChoosenPCs.pdf", figdir))
+      ggsave(sprintf("%s/ChoosenPCs.pdf", fig_dir))
     }
-  }
+  } 
   else {
+    DefaultAssay(srobj) <- 'RNA'
+    #Run PCA under RNA for Jackstraw
+
+    srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
     suppressWarnings({srobj <- JackStraw(srobj, dims=50)})
     srobj <- ScoreJackStraw(srobj, dims=1:ncol(srobj@reductions$pca@cell.embeddings))
     nPCs <- which(JS(srobj$pca)@overall.p.values[,"Score"] < significance)
-    if (!is.null(figdir)) {
+    if (!is.null(fig_dir)) {
       JackStrawPlot(srobj, dims = 1:ncol(srobj@reductions$pca@cell.embeddings)) + NoLegend()
-      ggsave(sprintf("%s/ChoosenPCs.pdf", figdir))
+      ggsave(sprintf("%s/ChoosenPCs.pdf", fig_dir))
     }
+    DefaultAssay(srobj) <- 'SCT'
+  }
+  if (length(nPCs) <= 2) {
+    nPCs <- 1:2
+  }
+  return(nPCs)
+}
+
+ChoosePCs_JackStraw <- function(srobj, threshold=0.01, fig_dir=NULL) {
+  suppressWarnings({srobj <- JackStraw(srobj, dims=50)})
+  srobj <- ScoreJackStraw(srobj, dims=1:ncol(srobj@reductions$pca@cell.embeddings))
+  nPCs <- which(JS(srobj$pca)@overall.p.values[,"Score"] < threshold)
+  if (!is.null(fig_dir)) {
+    JackStrawPlot(srobj, dims = 1:ncol(srobj@reductions$pca@cell.embeddings)) + NoLegend()
+    ggsave(sprintf("%s/ChoosenPCs.pdf", fig_dir))
   }
   if (length(nPCs) < 2) {
     nPCs <- 1:2
@@ -279,96 +286,46 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
   return(nPCs)
 }
 
-#' wrapper for basic seurat choosing
-#'
-#' runs: FindVariableFeatures(srobj, nfeatures=2000, selection.method = "disp")
-#'
-#' @param srobj seurat object
-#' @return srobj with highly variable features selected
-#' @export
 ChooseHVG_default <- function(srobj) {
   FindVariableFeatures(srobj, nfeatures=2000, selection.method = "disp")
 }
 
-#' wrapper for ChooseClusterResolutionDownsample enables downsampling srobj before choosing resolution
-#'
-#' @param srobj seurat object
-#' @param downsample_num max number of cells to allow in seurat object, downsamples to this number
-#' @param PreProcess_fun function to use to preprocess seurat object, must make ready for calling Seurat::FindClusters
-#' @param ... optional arguments for ChooseClusterResolutionDownsample
-#' @return seurat object with optimal cluster in `srobj$Best.Clusters` & resolution choice in `srobj@misc$resolution.choice`
-#' @export
 ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
                                             PreProcess_fun = PreProcess, ...) {
   #' get resolution from paramsweep of heavily downsampled dataset
-
+  
   # downsample to 10% of data
   # downsample input srobj?
-  if ((downsample_num < Inf) & (downsample_num <  ncol(srobj))) {
+  if ((downsample_num < Inf) & (downsample_num <  ncol(srobj)) & ncol(srobj) >= 100) {
     cells <- sample(colnames(srobj), downsample_num)
     srobj <- subset(srobj, cells=cells)
     srobj <- PreProcess_fun(srobj)
   }
-  srobj <- ChooseClusterResolutionDownsample(srobj, ...)
+  #setting resolution choice to arbitrary number in case of error
+  srobj@misc$resolution.choice = 1
+  tryCatch({srobj <- ChooseClusterResolutionDownsample(srobj, ...)
+          }, error = function(e) {
+            message('Silhouette Analysis failed, likely due to reached base condition. resolution set to 1. WARNING: Double check your result.')
+            print(paste("Silhouette Analysis error: ", e))
+          })
   return(srobj@misc$resolution.choice)
-
+  
 }
 
-#' Used in BaseCondition_default, determines if two clusters are different from gene expression
-#'
-#' @param srobj seurat object
-#' @param ident1 Idents(srobj) label for group 1
-#' @param ident1 Idents(srobj) label for group 2
-#' @param nUpregulated threshold number of genes up regulated for clusters to be called different
-#' @param nDownregulated threshold number of genes down regulated for clusters to be called different
-#' @return bool whether two clusters have differential gene expression between them
-#' @export
 EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 5, nDownregulated = 5) {
-  markers <- FindMarkers(srobj, ident.1=ident1, ident.2=ident2)
-  sig.markers <- markers[
+  tryCatch({ 
+    markers <- FindMarkers(srobj, ident.1=ident1, ident.2=ident2)
+    sig.markers <- markers[
     which((abs(markers$avg_logFC) >= 1.5) & (markers$p_val_adj < 0.05)), ]
+    return((sum(sig.markers$avg_logFC > 0) > nUpregulated) & 
+       (sum(sig.markers$avg_logFC < 0) > nDownregulated))
 
-  return((sum(sig.markers$avg_logFC > 0) > nUpregulated) & 
-           (sum(sig.markers$avg_logFC < 0) > nDownregulated))
+  }, error = function(e) {
+    message("Failed to compare end clusters due to too few cells or too few genes. combining anyway");
+    return(FALSE)    
+  })
 }
 
-#' How to determine of tiered clustering should stop
-#'
-#' @param srobj v3 seurat object
-#' @param min_cluster_size defaults to 100
-#' @param max_tiers defaults to 10, determines last tier
-#' @return 0 if should continue, ints > 0 indicate first base condition reached
-#' @export
-BaseCondition_default <- function(srobj, min_cluster_size=100, max_tiers=10) {
-
-  #' if min cells or max tiers: stop
-  if ( (ncol(srobj) < min_cluster_size) | (srobj@misc$tier > max_tiers) ) {
-    message("found end state with min number of cells")
-    return(1)
-  }
-
-  #' if only one cluster return
-  if ( !(length(unique(Idents(srobj))) > 1) ) {
-    message("found end state with one cluster")
-    return(2)
-  }
-
-  #' if 2 clusts & different with diffexp ? continue : else stop
-  else if ( (length(unique(Idents(srobj))) == 2) &
-            !(EnoughDiffExp(srobj, levels(Idents(srobj))[1], levels(Idents(srobj))[2])) ) {
-    message("found end state with two indistinguishable clusters")
-    return(3)
-  }
-
-  return(0)
-}
-
-#' turns single seurat object into list of seurat objects, one for each ident in Idents(srobj)
-#'
-#' @param srobj seurat object
-#' @param project_nm_suffix suffix to append to `srobj@project.name`
-#' @return list of seurat objects
-#' @export
 SplitSrobjOnIdents <- function(srobj, proj_nm_suffix) {
   numbers_only <- function(x) !grepl("\\D", x)
   if (any(!numbers_only(levels(srobj)))) {
@@ -377,51 +334,108 @@ SplitSrobjOnIdents <- function(srobj, proj_nm_suffix) {
     idts <- sort(as.numeric(levels(Idents(srobj))))
   }
   lapply(idts,
-         function(idt) {tmp <- subset(srobj, idents=idt);
+         function(idt) {tmp <- subset(srobj, idents=idt); 
          tmp@project.name=paste0(tmp@project.name, idt, proj_nm_suffix, sep="_");
          return(tmp)})
 }
 
+EndNode_Write <- function(working_srobj, srobj_dir = NULL, endclust_dir = NULL, filename = NULL) {
+  if (!is.null(srobj_dir)) {
+    message(paste("saving srobj to", srobj_dir))
+    saveRDS(working_srobj, sprintf("%s/subset_srobj.rds", srobj_dir))
+  }
+  if (!is.null(endclust_dir)) {
+    write.table(as.matrix(colnames(working_srobj)),
+                sprintf("%s/%s.tsv", endclust_dir, filename),
+                sep="\t", row.names = F, col.names = F)
+  }    
+}
 
-#' Chooses Optimal Resolution for louvain clustering based on Silhouette score
-#'
-#' Credit: Carly Ziegler
-#'
-#' clusters across range of resolutions
-#' selects random downsample of cells (10% of cells)
-#' computes silhouette score for cells
-#' chooses resolution with max avg mean silhouette score
-#'
-#' @param input.srobj v3 seurat object
-#' @param assay assay to cluster on in Seurat object
-#' @param n.pcs which PCs to use (1:n) defaults to `input.srobj@misc$nPC` which needs to be set by user if used outside of tiered clustering
-#' @param sample.name name of sample defaults to Sys.time
-#' @param res.low inclusive lower bound of resolutions
-#' @param res.high inclusive upper bound of resolutions
-#' @param res.n how many resolutions to try within range
-#' @param bias If multiple equal resolutions, choose fewer or more clusters with lower or higher resolution
-#' @param figdir where to save QC plot
-#' @return seurat object with optimum clustering saved in `srobj$Best.Clusters`
-#' @export
+Node_Write <- function(working_srobj, srobj_dir = NULL) {
+  if (!is.null(srobj_dir)) {
+    message(paste("saving srobj to", srobj_dir))
+    saveRDS(working_srobj, sprintf("%s/subset_srobj.rds", srobj_dir))
+  }
+}
+
+QC_Plotting <- function(working_srobj, fig_dir=NULL) {
+  Idents(working_srobj) <- rep("all.data", ncol(working_srobj))
+    
+  VlnPlot(working_srobj, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = -1)
+  ggsave(sprintf("%s/QC_vln_plot.pdf", fig_dir))
+    
+  #' basic QC scatter plots
+  FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "percent.mt")
+  ggsave(sprintf("%s/QC_scatter_plot_nCount_pctMito.pdf", fig_dir))
+  FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  ggsave(sprintf("%s/QC_scatter_plot_nCount_nFeat.pdf", fig_dir))
+  
+}
+
+Plotting <- function(working_srobj,fig_dir=NULL) {
+
+  cell.num.per.clust <- table(Idents(working_srobj))
+  message("Cell counts per cluster: ",paste0(capture.output(cell.num.per.clust),collapse='\n'))
+
+  if (!is.null(fig_dir)) {
+    #' save basic cell counts
+    cat(sprintf("Srobj: with %s genes & %s cells", nrow(working_srobj), ncol(working_srobj)),
+        file = sprintf("%s/basic_counts.txt", fig_dir), sep="\n")
+    cat(sprintf("\n Choose %s PCs \n", working_srobj@misc$nPCs), file = sprintf("%s/basic_counts.txt", fig_dir), append = T)
+    cat("\nTable of num cells per cluster:\n", file = sprintf("%s/basic_counts.txt", fig_dir), append = T)
+    write.table(cell.num.per.clust, file = sprintf("%s/basic_counts.txt", fig_dir), row.names = F, append = T)  
+     
+    #' basic umap of clusters (using umap-learn, as only it is allowed on premade graphs)
+    working_srobj <- RunUMAP(working_srobj,
+                             dims=working_srobj@misc$nPCs, 
+                             n.neighbors = min(30L, ncol(working_srobj)-1))
+    DimPlot(working_srobj, reduction = "umap", label = T)
+    ggsave(sprintf("%s/cluster_umap.pdf", fig_dir))
+    
+    if (!is.null(working_srobj@meta.data$orig.ident)) {
+      DimPlot(working_srobj, group.by = "orig.ident", reduction = "umap", label = F)
+      ggsave(sprintf("%s/orig_ident_umap.pdf", fig_dir))
+    }
+
+    markers <- FindAllMarkers(working_srobj, assay = "RNA", only.pos = T, max.cells.per.ident = 2000)
+    if ( !(nrow(markers) < 1) ) {
+      top10markers <- markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05) %>%  top_n(10, avg_logFC)
+      write.table(top10markers, sprintf("%s/top10markers.tsv", fig_dir), sep="\t", row.names = F)
+      write.table(markers, sprintf("%s/allmarkers.tsv", fig_dir), sep="\t", row.names = F)
+      
+      #' output heatmap of markers
+      if (nrow(top10markers) < 5) {top10markers <- markers %>% group_by(cluster) %>% top_n(10, avg_logFC)}
+      tryCatch({ 
+        working_srobj <- ScaleData(working_srobj, features = top10markers$gene)
+        DoHeatmap(working_srobj, features = top10markers$gene, raster = F)
+        ggsave(sprintf("%s/top10markers_heatmap.pdf", fig_dir))
+      }, error = function(e) {message("Failed to produce heatmap"); print(paste("HEATMAP ERRORED ON:  ", e))})
+    }
+  }  
+  return(working_srobj)
+}
+
+
 ChooseClusterResolutionDownsample <- function(
   input.srobj, assay="RNA", n.pcs = input.srobj@misc$nPCs, sample.name =  format(Sys.time(), "%a-%b-%d-%X-%Y-%Z"),
   res.low = .01, res.high=3, res.n = 40, bias = "under", figdir=NULL) {
-
-  ######## step 1: save the input seurat object as a new temporary object,
+  
+  ######## step 1: save the input seurat object as a new temporary object, 
   ########         dont want to overwrite or change the original one with all of the parameter scans
-
-  srobj.tmp = input.srobj
+  
+  srobj.tmp = input.srobj 
   # in case there have been other things calculated in the metadata, just cut down to simplify/avoid errors
-  srobj.tmp@meta.data = srobj.tmp@meta.data[,c("nCount_RNA","nFeature_RNA")] # should just be the nUMI and nGene
-
+  srobj.tmp@meta.data = srobj.tmp@meta.data[,c("nCount_RNA","nFeature_RNA")] # should just be the nUMI and nGene  
+  
   ######## step 2: calculate the FindClusters over a large range of resolutions
   print("Performing parameter scan over multiple resolutions...")
 
   set.res = round(exp(seq(log(res.low), log(res.high), length.out=res.n)), digits=3)
+  
   srobj.tmp = FindClusters(srobj.tmp, assay=assay, dims.use = n.pcs, k.param=ceiling(0.5*sqrt(ncol(srobj.tmp))),
                            resolution=set.res[1], save.SNN=T, plot.SNN=F,
                            force.recalc=TRUE, verbose=FALSE)
-
+  
   res.that.work <- rep(T, length(set.res))
   for(i in 2:length(set.res)){
     tryCatch({
@@ -431,25 +445,25 @@ ChooseClusterResolutionDownsample <- function(
     print(paste("          ", round(100*i/length(set.res)), "% done with parameter scan", sep=""))
   }
   set.res <- set.res[res.that.work]
-
-
+  
+  
   ######## step 3: output plot of how the resolution changes the number of clusters you get
   n.clusters = vector(mode="numeric", length=length(set.res))
   names(n.clusters) = set.res
   for(i in 1:length(n.clusters)){
     n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
   }
-
+  
   ######## step 4: calculate the silhouette width for each resolution
   print("Computing a silhouette width for each cell, for each resolution...")
   require(cluster)
-
+  
   dist.temp = cor(t(srobj.tmp@reductions$pca@cell.embeddings[,n.pcs]), method="pearson")
   # consider changing to sampling 10% of each cluster, runs into issues calc silhouette score if there is only 1 cell in each cluster
   random.cells.choose = if ( nrow(dist.temp) > 500 ) sample(1:nrow(dist.temp), round(nrow(dist.temp)/10, digits=0)) else 1:nrow(dist.temp)
   dist.temp.downsample = dist.temp[random.cells.choose, random.cells.choose]
   sil.all.matrix = matrix(data=NA, nrow=nrow(dist.temp.downsample), ncol=0)
-
+  
   for(i in 1:length(set.res)){
     clusters.temp = as.numeric(as.vector(
       srobj.tmp@meta.data[random.cells.choose,paste0(assay, "_snn_res.", set.res[i])]))
@@ -461,21 +475,21 @@ ChooseClusterResolutionDownsample <- function(
       sil.all.matrix = cbind(sil.all.matrix, rep(0, length(clusters.temp)))
     }
     print(paste("          ", round(100*i/length(set.res)), "% done with silhouette calculation", sep=""))
-
+    
   }
-
-
+  
+  
   ######## step 5: calculate summary metric to compare the silhouette distributions,
   ########         average has worked well so far... could get fancier
-
+  
   print("Identifying a best resolution to maximize silhouette width")
   sil.average = setNames(colMeans(sil.all.matrix), set.res)
   sil.medians <- setNames(apply(sil.all.matrix, 2, median), set.res)
-
-  ######## step 6: automate choosing resolution that maximizes the silhouette
+  
+  ######## step 6: automate choosing resolution that maximizes the silhouette 
   hist.out = hist(sil.average, length(sil.average)/1.2,  plot=FALSE)
-
-  #  take the ones that fall into the top bin,
+  
+  #  take the ones that fall into the top bin, 
   #  and the max OR MIN of those  ******* can change this to under vs over cluster
   if(bias=="over"){
     resolution.choice = as.numeric(max(
@@ -485,24 +499,23 @@ ChooseClusterResolutionDownsample <- function(
     resolution.choice = as.numeric(min(
       names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
   }
-
-  # get the silhouette of the best resolution:
+  
+  # get the silhouette of the best resolution: 
   silhouette.best = as.numeric(sil.average[paste(resolution.choice)])
-
+  
   print(paste("Best Resolution Choice: ", resolution.choice, ", with average silhouette score of: ",
               round(silhouette.best, digits=3), ", giving ", as.numeric(n.clusters[paste(resolution.choice)]),
               " clusters", sep=""))
-
-
-  ######### step 7: output plot and data
-
+  
+  ######### step 7: output plot and data 
+  
   if (!is.null(figdir)) {
-
+    
     print(paste0("Ouptutting summary statistics and returning seurat object... ",
                  "This will create a pdf in your output directory,",
                  " and will return your input seurat object ammended with the best choice",
                  " for clusters (found as Best.Clusters in the meta.data matrix, and set to your new ident)..."))
-
+    
     pdf(paste(figdir, "/", sample.name, ".pdf", sep=""),
         width=10, height=4, useDingbats=FALSE)
     par(mfrow=c(1,3))
@@ -510,7 +523,7 @@ ChooseClusterResolutionDownsample <- function(
     plot(set.res, n.clusters, col="black", pch=19,
          type="p", xlab="Resolution", ylab="# Clusters",
          main="Resolution vs. # Clusters")
-
+    
     # Resolution vs Average Silhouette
     plot(set.res, sil.average, col="black", pch=19,
          type="p", xlab="Resolution", ylab="Average Silhouette",
@@ -518,7 +531,7 @@ ChooseClusterResolutionDownsample <- function(
     points(set.res, sil.medians, col="red", pch=15)
     abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
     abline(v=resolution.choice, col="dodgerblue2", lty=2)
-
+    
     # N Clusters vs Average Silhouette
     plot(n.clusters, sil.average, col="black", pch=19,
          type="p", xlab="# Clusters", ylab="Average Silhouette",
@@ -528,129 +541,15 @@ ChooseClusterResolutionDownsample <- function(
     abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
     dev.off()
   }
-
-  ######## step 8: return the original seurat object, with the metadata containing a
+  
+  ######## step 8: return the original seurat object, with the metadata containing a 
   ########         concatenated vector with the clusters defined by the best choice here,
   ########         as well as the ident set to this new vector
-
+  
   Best.Clusters = srobj.tmp@meta.data[,paste0(assay, "_snn_res.", resolution.choice)]
-
+  
   input.srobj$Best.Clusters = Best.Clusters
   Idents(input.srobj) = input.srobj$Best.Clusters
   input.srobj@misc <- list("resolution.choice" = resolution.choice)
   return(input.srobj)
-}
-
-#' DEPRICATED
-#' Binomial signifcance test for on/off gene expression
-#'
-#' #######################################################################################################
-#' Gratefully stolen from:
-#' S4 class file for Shekhar et al.,
-#'    "Comprehensive classification of retinal bipolar cells using single-cell transcriptomics", Cell, 2016
-#' https://raw.githubusercontent.com/broadinstitute/BipolarCell2016/master/class.R
-#'
-#' Ported to work with Seurat v3 by Benjamin Doran Oct 2019
-#' Added columns for FDR and posFrac to output by default
-#'
-#' #######################################################################################################
-#'
-#' @param object Seruat object
-#' @param clust.1 label of Ident(object) to use as group 1
-#' @param clust.2 label of Ident(object) to use as group 2 defaults: rest
-#' @param effect.size log2 foldchange threshold for effect size significance
-#' @param TPM.mat Transcripts/million matrix
-#' @param Count.mat Count matrix
-#' @return significant gene data.frame
-#' @export
-markers.binom <- function(object, clust.1, clust.2=NULL, effect.size=log(2), TPM.mat=NULL, Count.mat=NULL) {
-  genes.use=rownames(object@assays$RNA@data)
-  clust.use=Idents(object)
-  cells.1=names(clust.use[which(clust.use%in%clust.1)])
-
-  if (is.null(clust.2)) {
-    clust.2="rest"
-    cells.2=names(clust.use)
-    cells.2=cells.2[!(cells.2%in%cells.1)]
-  } else {
-    cells.2=names(clust.use[which(clust.use%in%clust.2)])
-  }
-
-  Count.mat = object@assays$RNA@counts
-  if (is.null(TPM.mat)) TPM.mat = exp(object@assays$RNA@data[, c(cells.1, cells.2)])-1
-  if (is.null(Count.mat)) Count.mat = object@assays$RNA@counts[genes.use, c(cells.1, cells.2)]
-  result=binomcount.test(object, cells.1, cells.2, effect.size, TPM.mat, Count.mat)
-
-  if (nrow(result) < 1) {
-    return(setNames(data.frame(matrix(ncol = 7, nrow = 0)),
-                    c("log.effect", "pval", "fdr", "posFrac.1", "posFrac.2", "nTrans_1", "nTrans_2")))
-  }
-
-  result[,"posFrac.1"] <- posFrac.1 <- apply(object@assays$RNA@data[rownames(result),cells.1, drop=F],1,function(x) round(sum(x > 0)/length(x),2))
-  result[,"posFrac.2"] <- posFrac.2 <- apply(object@assays$RNA@data[rownames(result),cells.2, drop=F],1,function(x) round(sum(x > 0)/length(x),2))
-
-  if (clust.2=="rest"){
-    genes.include = posFrac.1 >= 0.1
-  } else{
-    genes.include = (posFrac.1 >= 0.1) | (posFrac.2 >= 0.1)
-  }
-
-  result = result[genes.include,]
-  result = result[order(abs(result$log.effect), decreasing=TRUE),]
-
-  if (nrow(result) < 1) {
-    return(setNames(data.frame(matrix(ncol = 7, nrow = 0)),
-                    c("log.effect", "pval", "fdr", "posFrac.1", "posFrac.2", "nTrans.1", "nTrans.2")))
-  }
-
-  #Mean number of transcripts per cell
-  if (!is.null(attr(object@assays$RNA,"counts"))){
-    nTrans.1 = apply(object@assays$RNA@counts[rownames(result), cells.1, drop=F], 1, function(x) round(mean(x),3))
-    nTrans.2 = apply(object@assays$RNA@counts[rownames(result), cells.2, drop=F], 1, function(x) round(mean(x),3))
-    result[,"nTrans.1"] = nTrans.1
-    result[,"nTrans.2"] = nTrans.2
-  }
-
-  return(result)
-}
-
-#' Binomial signifcance test for on/off gene expression
-#'
-#' @param object Seruat object
-#' @param cells.1 cell names of group 1
-#' @param cells.2 cell names of group 2
-#' @param effect.size log2 foldchange threshold for effect size significance
-#' @param TPM.mat Transcripts/million matrix
-#' @param Count.mat Count matrix
-#' @return significant gene data.frame
-#' @export
-binomcount.test <- function(object, cells.1, cells.2, effect.size, TPM.mat, Count.mat) {
-
-  x=TPM.mat
-  y=Count.mat
-
-  #Test for enrichments in cluster #1
-  m = apply(x[, cells.2], 1, function(x) sum(x>0)) #Number of cells expressing marker in cluster #2
-  m1 = m; m1[m==0]=1; # Regularization. Add a pseudo count of 1 to unexpressed markers to avoid false positives
-  n = apply(x[, cells.1], 1, function(x) sum(x>0)) #Number of cells expressing marker in cluster #1
-  #Find the probability of finding n or more cells +ve for marker in cluster 1 given the fraction in cluster 2
-  pv1 = pbinom(n, length(cells.1), m1/length(cells.2), lower.tail = FALSE) + dbinom(n, length(cells.1), m1/length(cells.2))
-
-  log_fold_express = log(n*length(cells.2)/(m*length(cells.1))) #log proportion of expressing cells
-  d1 <- data.frame(log.effect=log_fold_express,pval=pv1)
-  d1 <- subset(d1, log.effect >= effect.size)
-  d1 <- d1[order(d1$pval,decreasing=FALSE),]
-
-  #Enrichments in cells.2
-  n1 = n; n1[n==0]=1; # Regularization.  Add a pseudo count of 1 to unexpressed markers to avoid false positives
-  #Find the probability of finding m or more cells +ve for marker in cluster 2 given the fraction in cluster 1
-  pv2 = pbinom(m, length(cells.2), n1/length(cells.1), lower.tail=FALSE) + dbinom(m, length(cells.2), n1/length(cells.1))
-  d2 <- data.frame(log.effect=log_fold_express,pval=pv2)
-  d2 <- subset(d2, log.effect <= -effect.size)
-  d2 <- d2[order(d2$pval,decreasing=FALSE),]
-
-  d = rbind(d1, d2);
-  d = d[order(d$pval, decreasing=FALSE),]
-  d$fdr <- p.adjust(d$pval, method="fdr")
-  return(d)
 }
