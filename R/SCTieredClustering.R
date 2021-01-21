@@ -3,8 +3,8 @@ require(Seurat)
 require(tidyverse)
 require(devtools)
 require(data.table)
-library(glmGamPoi)
-library(parallel)
+require(glmGamPoi)
+require(future)
 
 #' Performs Iterative clustering of a v3 Seurat object
 #'
@@ -194,13 +194,13 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 }
 
 
-PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, fig_dir=NULL) {
+PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, fig_dir=NULL, ...) {
   #' seurat v3 processing
   srobj <- NormalizeData(object = srobj)
   srobj <- ChooseHVG_fun(srobj)
   srobj <- ScaleData(object = srobj, features=VariableFeatures(srobj))
   srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
-  nPCs  <- ChoosePCs_fun(srobj, fig_dir=figdir)
+  nPCs  <- ChoosePCs_fun(srobj, figure_dir=fig_dir)
   srobj@misc$nPCs <- nPCs
   message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
   srobj <- FindNeighbors(object = srobj, dims=nPCs)
@@ -240,14 +240,14 @@ PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig
 
   srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
 
-  nPCs  <- ChoosePCs_fun(srobj, fig_dir=figdir)
+  nPCs  <- ChoosePCs_fun(srobj, figure_dir=fig_dir)
   srobj@misc$nPCs <- nPCs
   message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
   srobj <- FindNeighbors(object = srobj, dims=nPCs)
   return(srobj)
 }
 
-ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.01, fig_dir=NULL) {
+ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.01, figure_dir=NULL) {
   #' if num cells > 500 use elbow plot if small use jackstraw, 
   #'   if none sig use first 2 pcs
 
@@ -255,10 +255,10 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
     eigValues <- (srobj@reductions$pca@stdev)^2  ## EigenValues
     varExplained <- eigValues / sum(eigValues)
     nPCs <- 1:max(which(diff(varExplained) < quantile(diff(varExplained), 1-improved_diff_quantile)) + 1)
-    if (!is.null(fig_dir)) {
+    if (!is.null(figure_dir)) {
       ElbowPlot(srobj, ndims=ncol(srobj@reductions$pca@cell.embeddings)) + 
         geom_vline(xintercept  = length(nPCs), color="red")
-      ggsave(sprintf("%s/ChoosenPCs.pdf", fig_dir))
+      ggsave(sprintf("%s/ChoosenPCs.pdf", figure_dir))
     }
   } 
   else {
@@ -269,9 +269,9 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
     suppressWarnings({srobj <- JackStraw(srobj, dims=50)})
     srobj <- ScoreJackStraw(srobj, dims=1:ncol(srobj@reductions$pca@cell.embeddings))
     nPCs <- which(JS(srobj$pca)@overall.p.values[,"Score"] < significance)
-    if (!is.null(fig_dir)) {
+    if (!is.null(figure_dir)) {
       JackStrawPlot(srobj, dims = 1:ncol(srobj@reductions$pca@cell.embeddings)) + NoLegend()
-      ggsave(sprintf("%s/ChoosenPCs.pdf", fig_dir))
+      ggsave(sprintf("%s/ChoosenPCs.pdf", figure_dir))
     }
     DefaultAssay(srobj) <- 'SCT'
   }
@@ -281,13 +281,13 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
   return(nPCs)
 }
 
-ChoosePCs_JackStraw <- function(srobj, threshold=0.01, fig_dir=NULL) {
+ChoosePCs_JackStraw <- function(srobj, threshold=0.01, figure_dir=NULL) {
   suppressWarnings({srobj <- JackStraw(srobj, dims=50)})
   srobj <- ScoreJackStraw(srobj, dims=1:ncol(srobj@reductions$pca@cell.embeddings))
   nPCs <- which(JS(srobj$pca)@overall.p.values[,"Score"] < threshold)
-  if (!is.null(fig_dir)) {
+  if (!is.null(figure_dir)) {
     JackStrawPlot(srobj, dims = 1:ncol(srobj@reductions$pca@cell.embeddings)) + NoLegend()
-    ggsave(sprintf("%s/ChoosenPCs.pdf", fig_dir))
+    ggsave(sprintf("%s/ChoosenPCs.pdf", figure_dir))
   }
   if (length(nPCs) < 2) {
     nPCs <- 1:2
