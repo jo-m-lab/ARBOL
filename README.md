@@ -52,9 +52,12 @@ based on the hetrogeneity of your data.
 * *cluster_assay* assay to use for clustering defaults to "SCT"
 * *cells* cellnames if tiered clustering should start on subset of object
 * *tier* starting level defaults to 0
-* *clustN* cluster starting from default to 0
+* *clustN* cluster starting point. default to 0
 * *PreProcess_fun* function to use for preproccessing defaults to PreProcess_sctransform
-* *BaseCondition_fun* function to determine if clustering should continue to recurse
+* *min_cluster_size* minimum number of cells to allow further clustering
+* *max_tiers* maximum number of tiers to allow further clustering
+* *EnoughDiffUp* minimum number of up-regulated genes to call clusters unique. Differential expression is performed when clustering finds 2 clusters
+* *EnoughDiffDown* minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped
 * *ChooseOptimalClustering_fun* function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
 * *saveSROBJdir* where to save seurat objects for each tier and cluster, if null does not save
 * *figdir* where to save QC figures for each tier and cluster, if null does not save

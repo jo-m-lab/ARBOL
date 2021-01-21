@@ -2,20 +2,14 @@
 % Please edit documentation in R/SCTieredClustering.R
 \name{PreProcess_sctransform}
 \alias{PreProcess_sctransform}
-\title{preprocess seurat object using SCTransform}
+\title{seurat v3 processing}
 \usage{
-PreProcess_sctransform(srobj, ChoosePCs_fun = ChoosePCs_default, figdir = NULL)
-}
-\arguments{
-\item{srobj}{seurat object}
-
-\item{ChoosePCs_fun}{function that chooses PCs}
-
-\item{figdir}{where to save QC Plots}
-}
-\value{
-preprocessed seurat object, default assay is SCT, also has normalized RNA assay
+PreProcess_sctransform(
+  srobj,
+  ChoosePCs_fun = ChoosePCs_default,
+  fig_dir = NULL
+)
 }
 \description{
-preprocess seurat object using SCTransform
+seurat v3 processing
 }

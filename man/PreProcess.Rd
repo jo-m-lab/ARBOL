@@ -2,27 +2,15 @@
 % Please edit documentation in R/SCTieredClustering.R
 \name{PreProcess}
 \alias{PreProcess}
-\title{old method for preprocessing seurat object}
+\title{seurat v3 processing}
 \usage{
 PreProcess(
   srobj,
   ChoosePCs_fun = ChoosePCs_default,
   ChooseHVG_fun = ChooseHVG_default,
-  figdir = NULL
+  fig_dir = NULL
 )
 }
-\arguments{
-\item{srobj}{seurat object}
-
-\item{ChoosePCs_fun}{function that chooses PCs}
-
-\item{ChooseHVG_fun}{function that selects highly variable genes}
-
-\item{figdir}{where to save QC Plots}
-}
-\value{
-preprocessed seurat object in RNA assay
-}
 \description{
-Not used
+seurat v3 processing
 }

@@ -26,7 +26,11 @@ library(parallel)
 #' @param tier starting level defaults to 0
 #' @param clustN cluster starting from default to 0
 #' @param PreProcess_fun function to use for preproccessing defaults to PreProcess_sctransform
-#' @param ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
+#' @param min_cluster_size minimum number of cells to allow further clustering. defaults to 100
+#' @param max_tiers maximum number of tiers to allow further clustering. defaults to 10
+#' @param EnoughDiffUp minimum number of up-regulated genes to call clusters unique. Differential expression is performed when clustering finds 2 clusters. defaults to 5
+#' @param EnoughDiffDown minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped. defaults to 5
+#' @param ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution 
 #' @param saveSROBJdir where to save seurat objects for each tier and cluster, if null does not save
 #' @param figdir where to save QC figures for each tier and cluster, if null does not save
 #' @param saveEndNamesDir where to save directory of end clusters, if null does not save
@@ -34,12 +38,11 @@ library(parallel)
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
 
-
 GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
                               PreProcess_fun = PreProcess_sctransform,
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
                               saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
-                              min_cluster_size = 100, max_tiers = 10) {
+                              min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5) {
   ######################################################################################################
   #' make sure output directories exist
   ######################################################################################################
@@ -78,6 +81,12 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   ######################################################################################################
   #' check if too few cells or past tier 10. if so, return end-node without processing
   ######################################################################################################
+
+  if (min_cluster_size < 5) {
+    message('WARNING: setting minimum cluster size to < 5 will throw errors in processing functions. \n 
+             the full run should finish, but all processing of srobj < 5 cells is unreliable. \n
+             Search "failure" in logs for information')
+  }
 
   if ( (ncol(working_srobj) < min_cluster_size) | (working_srobj@misc$tier > max_tiers) ) {
     message(cbind("found end-node below min number of cells or above max tier. num cells: ", ncol(working_srobj),' < ', min_cluster_size))
@@ -134,10 +143,10 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     return(working_srobj)
   }
 
-  #' if two indistinguishable clusters, defined by differential expression analysis
+  #' if two indistinguishable clusters, defined by # genes differential expression with FDR < 0.05
 
   if ( (length(unique(Idents(working_srobj))) == 2) ) {
-    if ( !(EnoughDiffExp(working_srobj, levels(Idents(working_srobj))[1], levels(Idents(working_srobj))[2])) ) {
+    if ( !(EnoughDiffExp(working_srobj, levels(Idents(working_srobj))[1], levels(Idents(working_srobj))[2], nUpregulated = EnoughDiffUp, nDownregulated = EnoughDiffDown)) ) {
       message("found end state with two indistinguishable clusters")
       
       Idents(working_srobj) <- 0
@@ -239,7 +248,7 @@ PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig
 }
 
 ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.01, fig_dir=NULL) {
-  #' if num cells big use elbow plot if small use jackstraw, 
+  #' if num cells > 500 use elbow plot if small use jackstraw, 
   #'   if none sig use first 2 pcs
 
   if (ncol(srobj) > 500) {
@@ -305,12 +314,13 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
   srobj@misc$resolution.choice = 1
   tryCatch({srobj <- ChooseClusterResolutionDownsample(srobj, ...)
           }, error = function(e) {
-            message('Silhouette Analysis failed, likely due to reached base condition. resolution set to 1. WARNING: Double check your result.')
+            message('Silhouette Analysis failed. resolution set to 1. WARNING: Double check your result.')
             print(paste("Silhouette Analysis error: ", e))
           })
   return(srobj@misc$resolution.choice)
   
 }
+
 
 EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 5, nDownregulated = 5) {
   tryCatch({ 
@@ -325,6 +335,7 @@ EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 5, nDownregulate
     return(FALSE)    
   })
 }
+
 
 SplitSrobjOnIdents <- function(srobj, proj_nm_suffix) {
   numbers_only <- function(x) !grepl("\\D", x)

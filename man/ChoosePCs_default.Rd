@@ -2,30 +2,17 @@
 % Please edit documentation in R/SCTieredClustering.R
 \name{ChoosePCs_default}
 \alias{ChoosePCs_default}
-\title{Chooses PCs to use for downstream clustering and visualization}
+\title{if num cells > 500 use elbow plot if small use jackstraw, 
+  if none sig use first 2 pcs}
 \usage{
 ChoosePCs_default(
   srobj,
   improved_diff_quantile = 0.85,
   significance = 0.01,
-  figdir = NULL
+  fig_dir = NULL
 )
 }
-\arguments{
-\item{srobj}{seurat object}
-
-\item{improved_diff_quantile}{lower bound of how many PCs to include after caclulating cumlative difference of variances}
-
-\item{significance}{significance threshold for JackStraw}
-
-\item{figdir}{where to save QC plots}
-}
-\value{
-vector of indexs for PCs to use (1:n)
-}
 \description{
-if n cells > 500 calculates from elbow plot cumulative diffs in PC variances, selects upto deepest PC from list of differences in variances
-   emulates selecting from elbow plot manually, Looking for dips in explained variance and selecting at that threshold
-if n cells < 500 selects significant PCs from Jackstraw
-if two methods above don't find any PCs selects first two PCs
+if num cells > 500 use elbow plot if small use jackstraw, 
+  if none sig use first 2 pcs
 }
