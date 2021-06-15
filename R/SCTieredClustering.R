@@ -38,6 +38,7 @@ require(future)
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
 
+
 GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
                               PreProcess_fun = PreProcess_sctransform,
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
@@ -54,9 +55,9 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   ######################################################################################################
   #' make sure QC metadata exists
   ######################################################################################################
-  if (is.null(srobj@meta.data$nFeature_RNA) & tier == 0) {srobj$nFeature_RNA <- Matrix::colSums(srobj@assays$RNA@counts > 0)}
-  if (is.null(srobj@meta.data$nCount_RNA) & tier == 0) {srobj$nCount_RNA <- Matrix::colSums(srobj@assays$RNA@counts)}
-  if (is.null(srobj@meta.data$percent.mt) & tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-")}
+  if (tier == 0) {srobj$nFeature_RNA <- Matrix::colSums(srobj@assays$RNA@counts > 0)}
+  if (tier == 0) {srobj$nCount_RNA <- Matrix::colSums(srobj@assays$RNA@counts)}
+  if (tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-")}
 
   ######################################################################################################
   #' basic processing
@@ -76,7 +77,10 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   message(paste0("file name: ", sprintf("%s/%s.tsv", SaveEndNamesDir, SaveEndFileName)))
 
   #' Basic QC plotting of end-nodes before interruption of recursion
-  QC_Plotting(working_srobj, fig_dir = figdir)
+  tryCatch({QC_Plotting(working_srobj, fig_dir = figdir)
+          },
+          error = function(e) {message('QC Plotting failure'); print(paste("error: ",e))
+          })
   
   ######################################################################################################
   #' check if too few cells or past tier 10. if so, return end-node without processing
@@ -139,24 +143,28 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     #write end-node table and srobj
     EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
     
-    message("found end state with one cluster")
+    message("found end-node with one cluster")
     return(working_srobj)
   }
 
+ #' if tier > 2 and
   #' if two indistinguishable clusters, defined by # genes differential expression with FDR < 0.05
 
-  if ( (length(unique(Idents(working_srobj))) == 2) ) {
-    if ( !(EnoughDiffExp(working_srobj, levels(Idents(working_srobj))[1], levels(Idents(working_srobj))[2], nUpregulated = EnoughDiffUp, nDownregulated = EnoughDiffDown)) ) {
-      message("found end state with two indistinguishable clusters")
-      
-      Idents(working_srobj) <- 0
-      working_srobj$two_not_quite_clusters <- working_srobj$seurat_clusters
-      working_srobj$seurat_clusters <- 0
+  if ( (working_srobj@misc$tier > 2) ) {
 
-      #write end-node table and srobj
-      EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
+    if ( (length(unique(Idents(working_srobj))) == 2) ) {
+      if ( !(EnoughDiffExp(working_srobj, levels(Idents(working_srobj))[1], levels(Idents(working_srobj))[2], nUpregulated = EnoughDiffUp, nDownregulated = EnoughDiffDown)) ) {
+        message("found end-node with two indistinguishable clusters")
+        
+        Idents(working_srobj) <- 0
+        working_srobj$two_not_quite_clusters <- working_srobj$seurat_clusters
+        working_srobj$seurat_clusters <- 0
 
-      return(working_srobj)
+        #write end-node table and srobj
+        EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
+
+        return(working_srobj)
+      }
     }
   }
 
@@ -176,22 +184,33 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   #' recurse along subsets
   return(lapply(seq_along(subsets),
                 function(i) {
+                  saveSROBJdir_nextTier=NULL
                   if (!is.null(saveSROBJdir)) {
                     saveSROBJdir_nextTier <- sprintf("%s/%s", saveSROBJdir, paste0("T", tier+1, "C", i-1))
                   }
+                  figdir_nextTier=NULL
                   if (!is.null(figdir)) {
                     figdir_nextTier <- sprintf("%s/%s", figdir, paste0("T", tier+1, "C", i-1))
                   }
+                  min_preserve = min_cluster_size
+                  max_preserve = max_tiers
+                  EnoughDiffUp_preserve = EnoughDiffUp
+                  EnoughDiffDown_preserve = EnoughDiffDown
                   GenTieredClusters(srobj,
                                     cells=colnames(subsets[[i]]),
                                     tier=tier+1, clustN = i-1,
                                     saveSROBJdir = saveSROBJdir_nextTier,
                                     figdir = figdir_nextTier,
                                     SaveEndNamesDir = SaveEndNamesDir,
-                                    SaveEndFileName = SaveEndFileName
+                                    SaveEndFileName = SaveEndFileName,
+                                    min_cluster_size=min_preserve,
+                                    max_tiers= max_preserve,
+                                    EnoughDiffUp = EnoughDiffUp_preserve,
+                                    EnoughDiffDown = EnoughDiffDown_preserve
                   )
                 }))
 }
+
 
 
 PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, fig_dir=NULL, ...) {
@@ -325,13 +344,14 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
 EnoughDiffExp <- function(srobj, ident1, ident2, nUpregulated = 5, nDownregulated = 5) {
   tryCatch({ 
     markers <- FindMarkers(srobj, ident.1=ident1, ident.2=ident2)
+    fccol <- grep("FC",colnames(markers))
     sig.markers <- markers[
-    which((abs(markers$avg_logFC) >= 1.5) & (markers$p_val_adj < 0.05)), ]
-    return((sum(sig.markers$avg_logFC > 0) > nUpregulated) & 
-       (sum(sig.markers$avg_logFC < 0) > nDownregulated))
+    which((abs(markers[,fccol]) >= 1.5) & (markers$p_val_adj < 0.05)), ]
+    return((sum(sig.markers[,fccol] > 0) > nUpregulated) & 
+       (sum(sig.markers[,fccol] < 0) > nDownregulated))
 
   }, error = function(e) {
-    message("Failed to compare end clusters due to too few cells or too few genes. combining anyway");
+    message("Failed to compare end clusters when exactly two. combining anyway. Error: ", e);
     return(FALSE)    
   })
 }
@@ -409,13 +429,15 @@ Plotting <- function(working_srobj,fig_dir=NULL) {
     }
 
     markers <- FindAllMarkers(working_srobj, assay = "RNA", only.pos = T, max.cells.per.ident = 2000)
+    
     if ( !(nrow(markers) < 1) ) {
-      top10markers <- markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05) %>%  top_n(10, avg_logFC)
+      fccol <- grep("FC",colnames(markers))
+      top10markers <- markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05) %>%  slice_max(markers[,fccol],n=10)
       write.table(top10markers, sprintf("%s/top10markers.tsv", fig_dir), sep="\t", row.names = F)
       write.table(markers, sprintf("%s/allmarkers.tsv", fig_dir), sep="\t", row.names = F)
       
       #' output heatmap of markers
-      if (nrow(top10markers) < 5) {top10markers <- markers %>% group_by(cluster) %>% top_n(10, avg_logFC)}
+      #if (nrow(top10markers) < 5) {top10markers <- markers %>% group_by(cluster) %>% slice_max(markers[,fccol],n=10)}
       tryCatch({ 
         working_srobj <- ScaleData(working_srobj, features = top10markers$gene)
         DoHeatmap(working_srobj, features = top10markers$gene, raster = F)
