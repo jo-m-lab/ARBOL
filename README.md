@@ -34,17 +34,19 @@ As a starting point, and to use the defaults here is some example code.
 source("path/to/cloned/git/repo/R/SCTieredClustering.R")
 
 srobj <- readRDS("/path/to/full_seurat_object.rds")
-tiers <- GenTieredclusters(srobj,
-                           saveSROBJdir = "~/teiredoutput/srobjs",
-                           figdir = "~/teiredoutput/figdir",
-                           SaveEndNamesDir = "~/teiredoutput/endclusts")
+tiers <- GenTieredClusters(srobj,
+                           saveSROBJdir = "~/tieredoutput/srobjs",
+                           figdir = "~/tieredoutput/figdir",
+                           SaveEndNamesDir = "~/tieredoutput/endclusts")
 ```
 
 **Note** This script can take a long time to run. running on 20K cells could 
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
-based on the hetrogeneity of your data.
+based on the heterogeneity of your data.
 
 **Note** RAM is also a consideration, for running on ~100k cells I needed 256GB of RAM.
+
+A guided tutorial for analysis is available: https://shaleklab.github.io/SCTieredClustering/
 
 ## Params
 
