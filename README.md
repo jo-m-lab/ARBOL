@@ -1,6 +1,6 @@
-# ARBOL
+# ARBOL <img src="docs/ARBOLsmall.jpg?raw=true" align="right">  
 
-Iterively clusters v4 seurat object from single cell datasets, choosing optimum 
+Iteratively clusters v4 seurat object from single cell datasets, choosing optimum 
 resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage.
 can return output directories figs/ srobjs/ (see examples) containing subset 
 seurat objects and QC plots matching tiered structure of found in dataset
@@ -31,7 +31,7 @@ As a starting point, and to use the defaults here is some example code.
 
 
 ```
-source("path/to/cloned/git/repo/R/SCTieredClustering.R")
+source("path/to/cloned/git/repo/R/ARBOL.R")
 
 srobj <- readRDS("/path/to/full_seurat_object.rds")
 tiers <- GenTieredClusters(srobj,
