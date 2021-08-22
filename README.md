@@ -1,6 +1,6 @@
-# SCTieredClustering
+# ARBOL
 
-Iterively clusters v3 seurat object from single cell datasets, choosing optimum 
+Iterively clusters v4 seurat object from single cell datasets, choosing optimum 
 resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage.
 can return output directories figs/ srobjs/ (see examples) containing subset 
 seurat objects and QC plots matching tiered structure of found in dataset
@@ -11,7 +11,7 @@ that comprise that cluster
 ## Install
 
 ```
-git clone https://github.com/ShalekLab/SCTieredClustering.git
+git clone https://github.com/ShalekLab/ARBOL.git
 ```
 
 ## Recommended Usage
@@ -23,7 +23,7 @@ work into choosing reasonable defaults, but there is no certainty that they are
 the best defaults for your data.
 
 I recommend cloning the git repository, and looking directly at the
-`./R/SCTieredClustering.R` script. I have tried to organize the script such that
+`./R/ARBOL.R` script. I have tried to organize the script such that
 each processing step is contained in a modular function that can be edited and
 inserted into the larger clustering steps.
 
@@ -34,15 +34,15 @@ As a starting point, and to use the defaults here is some example code.
 source("path/to/cloned/git/repo/R/SCTieredClustering.R")
 
 srobj <- readRDS("/path/to/full_seurat_object.rds")
-tiers <- GenTieredclusters(srobj,
-                           saveSROBJdir = "~/teiredoutput/srobjs",
-                           figdir = "~/teiredoutput/figdir",
-                           SaveEndNamesDir = "~/teiredoutput/endclusts")
+tiers <- GenTieredClusters(srobj,
+                           saveSROBJdir = "~/tieredoutput/srobjs",
+                           figdir = "~/tieredoutput/figdir",
+                           SaveEndNamesDir = "~/tieredoutput/endclusts")
 ```
 
 **Note** This script can take a long time to run. running on 20K cells could 
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
-based on the hetrogeneity of your data.
+based on the heterogeneity of your data.
 
 **Note** RAM is also a consideration, for running on ~100k cells I needed 256GB of RAM.
 
@@ -52,9 +52,13 @@ based on the hetrogeneity of your data.
 * *cluster_assay* assay to use for clustering defaults to "SCT"
 * *cells* cellnames if tiered clustering should start on subset of object
 * *tier* starting level defaults to 0
-* *clustN* cluster starting from default to 0
+* *clustN* cluster starting point. default to 0
 * *PreProcess_fun* function to use for preproccessing defaults to PreProcess_sctransform
-* *BaseCondition_fun* function to determine if clustering should continue to recurse
+* *min_cluster_size* minimum number of cells to allow further clustering
+* *max_tiers* maximum number of tiers to allow further clustering
+* *EnoughDiffUp* minimum number of up-regulated genes to call clusters unique. Differential expression is performed when clustering finds 2 clusters
+* *EnoughDiffDown* minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped
+* *tierAllowedRecomb* minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low in their DE.
 * *ChooseOptimalClustering_fun* function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
 * *saveSROBJdir* where to save seurat objects for each tier and cluster, if null does not save
 * *figdir* where to save QC figures for each tier and cluster, if null does not save
