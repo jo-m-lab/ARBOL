@@ -1,4 +1,4 @@
-Package: SCTieredClustering
+Package: ARBOL
 Type: Package
 Title: ARBOL: Tiered Clustering of Single Cell Data
 Version: 1.0.0
