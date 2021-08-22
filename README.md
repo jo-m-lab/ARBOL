@@ -1,4 +1,4 @@
-# ARBOL <img src="docs/ARBOLsmall.jpg?raw=true" align="right">  
+# ARBOL <img src="docs/ARBOLsmall.jpg?raw=true" align="right" style="max-width: 50%; max-height: 50%;">  
 
 Iteratively clusters v4 seurat object from single cell datasets, choosing optimum 
 resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage.
