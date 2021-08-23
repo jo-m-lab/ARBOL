@@ -18,12 +18,12 @@ git clone https://github.com/ShalekLab/ARBOL.git
 
 This package is meant as a starting point and to be edited/customized by YOU!
 
-There are a lot of decisions that go into this analysis. I have put a lot of 
+There are a lot of decisions that go into this analysis. We have put a lot of 
 work into choosing reasonable defaults, but there is no certainty that they are
 the best defaults for your data.
 
-I recommend cloning the git repository, and looking directly at the
-`./R/ARBOL.R` script. I have tried to organize the script such that
+We recommend cloning the git repository, and looking directly at the
+`./R/ARBOL.R` script. We have tried to organize the script such that
 each processing step is contained in a modular function that can be edited and
 inserted into the larger clustering steps.
 
@@ -44,7 +44,9 @@ tiers <- GenTieredClusters(srobj,
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
 based on the heterogeneity of your data.
 
-**Note** RAM is also a consideration, for running on ~100k cells I needed 256GB of RAM.
+**Note** RAM is also a consideration, for running on ~100k cells we needed 256GB of RAM.
+
+**Note** On the low end, just over 1GB RAM is needed per 1k cells and this number scales roughly linearly with cell number. On a 16GB laptop, one could expect to analyze around 12k cells.
 
 ## Params
 
