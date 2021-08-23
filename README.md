@@ -1,12 +1,12 @@
-# ARBOL <img src="docs/ARBOLsmall.jpg?raw=true" align="right" style="max-width: 10%; max-height: 10%;"/>  
+<img src="docs/ARBOLsmall.jpg?raw=true" align="right" width=500px>  
 
-Iteratively clusters v4 seurat object from single cell datasets, choosing optimum 
-resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage.
-can return output directories figs/ srobjs/ (see examples) containing subset 
-seurat objects and QC plots matching tiered structure of found in dataset
-can also return endclusts/ folder which contains tsv files named with the 
-path to the endcluster (T0C0_T1C1.tsv) and contains the cellnames (one per line) 
-that comprise that cluster
+Iteratively clusters single cell datasets using a Seurat v4 object as input. This method identifies and utilizes optimum 
+cluster resolution parameters at each tier of clustering. It provides outputs of QC plots for each tier and stage.
+Furthermore, it can return output directories figs/ srobjs/ (see examples) containing subset 
+seurat objects and QC plots matching tiered structure of found in dataset.
+It can also return endclusts/ folder which contains tsv files named with the 
+path to the endcluster (T0C0_T1C1.tsv) and containing the cellnames (one per line) 
+that comprise that cluster.
 
 ## Install
 
@@ -16,10 +16,18 @@ git clone https://github.com/ShalekLab/ARBOL.git
 
 ## Recommended Usage
 
-This package is meant as a starting point and to be edited/customized by YOU!
+ARBOL was developed and use in the paper, "A treatment-naïve cellular atlas of pediatric Crohn’s disease predicts disease severity and therapeutic response"
+We include here a tutorial where the FGID atlas figure is reproduced: 
+https://shaleklab.github.io/ARBOL/ARBOLtutorial.html
 
+<<<<<<< HEAD
 There are a lot of decisions that go into this analysis. We have put a lot of 
 work into choosing reasonable defaults, but there is no certainty that they are
+=======
+This package is meant as a starting point for the way that we approached clustering and and is meant to be edited/customized through community feedback through users such as yourself!
+
+We have dedicated effort to choosing reasonable defaults, but there is no certainty that they are
+>>>>>>> 9e394ef2ef0a89a488341e33886d10bb5a4bc649
 the best defaults for your data.
 
 We recommend cloning the git repository, and looking directly at the
@@ -27,8 +35,7 @@ We recommend cloning the git repository, and looking directly at the
 each processing step is contained in a modular function that can be edited and
 inserted into the larger clustering steps.
 
-As a starting point, and to use the defaults here is some example code.
-
+The main function of ARBOL is GenTieredClusters() - here is an example call
 
 ```
 source("path/to/cloned/git/repo/R/ARBOL.R")
@@ -40,17 +47,21 @@ tiers <- GenTieredClusters(srobj,
                            SaveEndNamesDir = "~/tieredoutput/endclusts")
 ```
 
-**Note** This script can take a long time to run. running on 20K cells could 
+**Note** This script can take a long time to run. Running on 20K cells could 
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
 based on the heterogeneity of your data.
 
+<<<<<<< HEAD
 **Note** RAM is also a consideration, for running on ~100k cells we needed 256GB of RAM.
 
 **Note** On the low end, just over 1GB RAM is needed per 1k cells and this number scales roughly linearly with cell number. On a 16GB laptop, one could expect to analyze around 12k cells.
+=======
+**Note** RAM is also a consideration, for running on ~100k cells, we routinely need to call on 128+GB of RAM. The current bottleneck is the SCTransform() call, which is run at each tier to renormalize to the input subset. 
+>>>>>>> 9e394ef2ef0a89a488341e33886d10bb5a4bc649
 
 ## Params
 
-* *srobj* v3 seurat object
+* *srobj* Seurat v4 object
 * *cluster_assay* assay to use for clustering defaults to "SCT"
 * *cells* cellnames if tiered clustering should start on subset of object
 * *tier* starting level defaults to 0
