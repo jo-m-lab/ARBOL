@@ -16,19 +16,22 @@ git clone https://github.com/ShalekLab/ARBOL.git
 
 ## Recommended Usage
 
+ARBOL was used in the paper, "A treatment-naïve cellular atlas of pediatric Crohn’s disease predicts disease severity and therapeutic response"
+We include here a tutorial where the FGID atlas figure is reproduced: 
+https://shaleklab.github.io/ARBOL/ARBOLtutorial.html
+
 This package is meant as a starting point and to be edited/customized by YOU!
 
-There are a lot of decisions that go into this analysis. I have put a lot of 
+We have put a lot of 
 work into choosing reasonable defaults, but there is no certainty that they are
 the best defaults for your data.
 
-I recommend cloning the git repository, and looking directly at the
-`./R/ARBOL.R` script. I have tried to organize the script such that
+We recommend cloning the git repository, and looking directly at the
+`./R/ARBOL.R` script. We have tried to organize the script such that
 each processing step is contained in a modular function that can be edited and
 inserted into the larger clustering steps.
 
-As a starting point, and to use the defaults here is some example code.
-
+The main function of ARBOL is GenTieredClusters() - here is an example call
 
 ```
 source("path/to/cloned/git/repo/R/ARBOL.R")
@@ -40,15 +43,15 @@ tiers <- GenTieredClusters(srobj,
                            SaveEndNamesDir = "~/tieredoutput/endclusts")
 ```
 
-**Note** This script can take a long time to run. running on 20K cells could 
+**Note** This script can take a long time to run. Running on 20K cells could 
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
 based on the heterogeneity of your data.
 
-**Note** RAM is also a consideration, for running on ~100k cells I needed 256GB of RAM.
+**Note** RAM is also a consideration, for running on ~100k cells, I needed 128+GB of RAM. The current bottleneck is the SCTransform() call, which is run at each tier to renormalize to the subset
 
 ## Params
 
-* *srobj* v3 seurat object
+* *srobj* v4 seurat object
 * *cluster_assay* assay to use for clustering defaults to "SCT"
 * *cells* cellnames if tiered clustering should start on subset of object
 * *tier* starting level defaults to 0
