@@ -20,14 +20,9 @@ ARBOL was developed and use in the paper, "A treatment-naïve cellular atlas of 
 We include here a tutorial where the FGID atlas figure is reproduced: 
 https://shaleklab.github.io/ARBOL/ARBOLtutorial.html
 
-<<<<<<< HEAD
-There are a lot of decisions that go into this analysis. We have put a lot of 
-work into choosing reasonable defaults, but there is no certainty that they are
-=======
 This package is meant as a starting point for the way that we approached clustering and and is meant to be edited/customized through community feedback through users such as yourself!
 
 We have dedicated effort to choosing reasonable defaults, but there is no certainty that they are
->>>>>>> 9e394ef2ef0a89a488341e33886d10bb5a4bc649
 the best defaults for your data.
 
 We recommend cloning the git repository, and looking directly at the
@@ -51,13 +46,9 @@ tiers <- GenTieredClusters(srobj,
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
 based on the heterogeneity of your data.
 
-<<<<<<< HEAD
-**Note** RAM is also a consideration, for running on ~100k cells we needed 256GB of RAM.
-
-**Note** On the low end, just over 1GB RAM is needed per 1k cells and this number scales roughly linearly with cell number. On a 16GB laptop, one could expect to analyze around 12k cells.
-=======
 **Note** RAM is also a consideration, for running on ~100k cells, we routinely need to call on 128+GB of RAM. The current bottleneck is the SCTransform() call, which is run at each tier to renormalize to the input subset. 
->>>>>>> 9e394ef2ef0a89a488341e33886d10bb5a4bc649
+
+**Note** The script requires approximately 1.2 GB RAM per 1k cells, meaning on a local machine with 16GB RAM, one could reasonably run 12k cells. 
 
 ## Params
 
