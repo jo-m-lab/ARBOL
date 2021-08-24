@@ -11,14 +11,14 @@ that comprise that cluster.
 ## Install
 
 ```
-git clone https://github.com/ShalekLab/ARBOL.git
+git clone https://github.com/jo-m-lab/ARBOL.git
 ```
 
 ## Recommended Usage
 
 ARBOL was developed and use in the paper, "A treatment-naïve cellular atlas of pediatric Crohn’s disease predicts disease severity and therapeutic response"
 We include here a tutorial where the FGID atlas figure is reproduced: 
-https://shaleklab.github.io/ARBOL/ARBOLtutorial.html
+https://jo-m-lab.github.io/ARBOL/ARBOLtutorial.html
 
 This package is meant as a starting point for the way that we approached clustering and and is meant to be edited/customized through community feedback through users such as yourself!
 
