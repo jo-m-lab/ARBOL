@@ -235,7 +235,7 @@ PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig
   tryCatch({
             srobj <- SCTransform(object = srobj, verbose=TRUE, method='glmGamPoi')
            }, error=function(e) 
-           {message(sprintf('SCTransform failed to run, likely due to too few cells. cell num: %s .... Defaulting back to log1p normalization',ncol(srobj)))
+           {message(sprintf('SCTransform failed to run, likely due to too few cells. cell num: %s .... Defaulting back to log1p normalization. error message: %s',ncol(srobj),e))
            })
   
   #If it fails, normalization defaults back to log1p
@@ -339,7 +339,9 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
     srobj <- PreProcess_fun(srobj)
   }
   #setting resolution choice to arbitrary number in case of error
-  srobj@misc$resolution.choice = 1
+  resolution.choice = 1
+  srobj@misc$resolution.choice = resolution.choice
+  srobj@misc <- list("resolution.choice" = resolution.choice)
   tryCatch({srobj <- chooseResolution_SilhouetteAnalysisParameterScan(srobj, ...)
           }, error = function(e) {
             message('Silhouette Analysis failed. resolution set to 1. WARNING: Double check your result.')
