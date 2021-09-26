@@ -108,8 +108,12 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
           error = function(e) {message('Pre-processing failure'); print(paste("Pre-processing error: ", e))
         })
   
-  #' Get optimum cluster resolution and cluster
+  #' Check if SCT ran successfully, if not, default back to log1p
+  if(!(cluster_assay %in% names(working_srobj@assays))){
+    cluster_assay="RNA"
+  }
 
+  #' Get optimum cluster resolution and cluster
   tryCatch({res <- ChooseOptimalClustering_fun(working_srobj,
                                      assay=cluster_assay,
                                      PreProcess_fun = PreProcess_fun,
@@ -119,9 +123,8 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
             error = function(e) {message('Resolution choice failure'); print(paste("Resolution choice error: ", e))
           })
   tryCatch({working_srobj <- FindClusters(working_srobj,
-                                assay = cluster_assay,
                                 resolution = res,
-                                k.param=ceiling(0.5*sqrt(ncol(working_srobj))))
+                                )
             },
             error = function(e) {message('FindClusters failure'); print(paste("Clustering error: ", e))
           })
@@ -225,7 +228,7 @@ PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun =
   nPCs  <- ChoosePCs_fun(srobj, figure_dir=fig_dir)
   srobj@misc$nPCs <- nPCs
   message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
-  srobj <- FindNeighbors(object = srobj, dims=nPCs)
+  srobj <- FindNeighbors(object = srobj, dims=nPCs, k.param= ceiling(0.5*sqrt(ncol(srobj))))
   return(srobj)
 }
 
@@ -235,7 +238,7 @@ PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig
   tryCatch({
             srobj <- SCTransform(object = srobj, verbose=TRUE, method='glmGamPoi')
            }, error=function(e) 
-           {message(sprintf('SCTransform failed to run, likely due to too few cells. cell num: %s .... Defaulting back to log1p normalization. error message: %s',ncol(srobj),e))
+           {message(sprintf('SCTransform failed to run, likely due to too few cells or RAM. cell num: %s .... Defaulting back to log1p normalization. error message: %s',ncol(srobj),e))
            })
   
   #If it fails, normalization defaults back to log1p
@@ -287,7 +290,7 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
     if (!is.null(figure_dir)) {
       ElbowPlot(srobj, ndims=ncol(srobj@reductions$pca@cell.embeddings)) + 
         geom_vline(xintercept  = length(nPCs), color="red")
-      ggsave(sprintf("%s/ChosenPCs.pdf", figure_dir))
+      ggsave(sprintf("%s/ChosenPCs.png", figure_dir))
     }
   } 
   else {
@@ -300,7 +303,7 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
     nPCs <- which(JS(srobj$pca)@overall.p.values[,"Score"] < significance)
     if (!is.null(figure_dir)) {
       JackStrawPlot(srobj, dims = 1:ncol(srobj@reductions$pca@cell.embeddings)) + NoLegend()
-      ggsave(sprintf("%s/ChosenPCs.pdf", figure_dir))
+      ggsave(sprintf("%s/ChosenPCs.png", figure_dir))
     }
     DefaultAssay(srobj) <- 'SCT'
   }
@@ -311,12 +314,13 @@ ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.
 }
 
 ChoosePCs_JackStraw <- function(srobj, threshold=0.01, figure_dir=NULL) {
+  message('Running JackStraw')
   suppressWarnings({srobj <- JackStraw(srobj, dims=50)})
   srobj <- ScoreJackStraw(srobj, dims=1:ncol(srobj@reductions$pca@cell.embeddings))
   nPCs <- which(JS(srobj$pca)@overall.p.values[,"Score"] < threshold)
   if (!is.null(figure_dir)) {
     JackStrawPlot(srobj, dims = 1:ncol(srobj@reductions$pca@cell.embeddings)) + NoLegend()
-    ggsave(sprintf("%s/ChosenPCs.pdf", figure_dir))
+    ggsave(sprintf("%s/ChosenPCs.png", figure_dir))
   }
   if (length(nPCs) < 2) {
     nPCs <- 1:2
@@ -339,13 +343,15 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
     srobj <- PreProcess_fun(srobj)
   }
   #setting resolution choice to arbitrary number in case of error
+  npcsave <- srobj@misc$nPCs
   resolution.choice = 1
   srobj@misc$resolution.choice = resolution.choice
   srobj@misc <- list("resolution.choice" = resolution.choice)
+  srobj@misc$nPCs <- npcsave
   tryCatch({srobj <- chooseResolution_SilhouetteAnalysisParameterScan(srobj, ...)
           }, error = function(e) {
             message('Silhouette Analysis failed. resolution set to 1. WARNING: Double check your result.')
-            print(paste("Silhouette Analysis error: ", e))
+            print(paste("Silhouette Analysis error: ", e))            
           })
   return(srobj@misc$resolution.choice)
   
@@ -381,6 +387,16 @@ SplitSrobjOnIdents <- function(srobj, proj_nm_suffix) {
          return(tmp)})
 }
 
+SplitSrobjOnMeta <- function(srobj, meta, proj_nm_suffix) {
+  metacol <- grep(meta,colnames(srobj@meta.data))
+    lapply(unique(srobj@meta.data[,metacol]),
+         function(x) {tmp <- subset(srobj, cells= (srobj@meta.data %>% 
+                          filter(srobj@meta.data[,metacol]==x) %>% pull(CellID))); 
+         tmp@project.name=paste0(tmp@project.name, x, proj_nm_suffix, sep="_");
+         tmp@meta.data <- srobj@meta.data %>% filter(srobj@meta.data[,metacol] == x)
+         return(tmp)})
+}
+
 EndNode_Write <- function(working_srobj, srobj_dir = NULL, endclust_dir = NULL, filename = NULL) {
   if (!is.null(srobj_dir)) {
     message(paste("saving srobj to", srobj_dir))
@@ -404,13 +420,13 @@ QC_Plotting <- function(working_srobj, fig_dir=NULL) {
   Idents(working_srobj) <- rep("all.data", ncol(working_srobj))
     
   VlnPlot(working_srobj, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = -1)
-  ggsave(sprintf("%s/QC_vln_plot.pdf", fig_dir))
+  ggsave(sprintf("%s/QC_vln_plot.png", fig_dir))
     
   #' basic QC scatter plots
   FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "percent.mt")
-  ggsave(sprintf("%s/QC_scatter_plot_nCount_pctMito.pdf", fig_dir))
+  ggsave(sprintf("%s/QC_scatter_plot_nCount_pctMito.png", fig_dir))
   FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-  ggsave(sprintf("%s/QC_scatter_plot_nCount_nFeat.pdf", fig_dir))
+  ggsave(sprintf("%s/QC_scatter_plot_nCount_nFeat.png", fig_dir))
   
 }
 
@@ -432,18 +448,18 @@ Plotting <- function(working_srobj,fig_dir=NULL) {
                              dims=working_srobj@misc$nPCs, 
                              n.neighbors = min(30L, ncol(working_srobj)-1))
     DimPlot(working_srobj, reduction = "umap", label = T)
-    ggsave(sprintf("%s/cluster_umap.pdf", fig_dir))
+    ggsave(sprintf("%s/cluster_umap.png", fig_dir))
     
     if (!is.null(working_srobj@meta.data$orig.ident)) {
       DimPlot(working_srobj, group.by = "orig.ident", reduction = "umap", label = F)
-      ggsave(sprintf("%s/orig_ident_umap.pdf", fig_dir))
+      ggsave(sprintf("%s/orig_ident_umap.png", fig_dir))
     }
 
     markers <- FindAllMarkers(working_srobj, assay = "RNA", only.pos = T, max.cells.per.ident = 2000)
     
     if ( !(nrow(markers) < 1) ) {
-      fccol <- grep("FC",colnames(markers))
-      top10markers <- markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05) %>%  slice_max(markers[,fccol],n=10)
+      #using 'avg_log2FC' here because slice_max won't take column index as input. will probably have errors with this in future
+      top10markers <- markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05) %>%  slice_max(avg_log2FC,n=10)
       write.table(top10markers, sprintf("%s/top10markers.tsv", fig_dir), sep="\t", row.names = F)
       write.table(markers, sprintf("%s/allmarkers.tsv", fig_dir), sep="\t", row.names = F)
       
@@ -452,7 +468,7 @@ Plotting <- function(working_srobj,fig_dir=NULL) {
       tryCatch({ 
         working_srobj <- ScaleData(working_srobj, features = top10markers$gene)
         DoHeatmap(working_srobj, features = top10markers$gene, raster = F)
-        ggsave(sprintf("%s/top10markers_heatmap.pdf", fig_dir))
+        ggsave(sprintf("%s/top10markers_heatmap.png", fig_dir))
       }, error = function(e) {message("Failed to produce heatmap"); print(paste("HEATMAP ERRORED ON:  ", e))})
     }
   }  
@@ -481,7 +497,7 @@ Plotting <- function(working_srobj,fig_dir=NULL) {
 #' @export
 
 chooseResolution_SilhouetteAnalysisParameterScan <- function(
-  input.srobj, assay="RNA", n.pcs = input.srobj@misc$nPCs, sample.name =  format(Sys.time(), "%a-%b-%d-%X-%Y-%Z"),
+  input.srobj, assay=cluster_assay, n.pcs = input.srobj@misc$nPCs, sample.name =  format(Sys.time(), "%a-%b-%d-%X-%Y-%Z"),
   res.low = .01, res.high=3, res.n = 40, bias = "under", figdir=NULL) {
   
   ######## step 1: save the input seurat object as a new temporary object, 
@@ -496,15 +512,12 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
 
   set.res = round(exp(seq(log(res.low), log(res.high), length.out=res.n)), digits=3)
   
-  srobj.tmp = FindClusters(srobj.tmp, assay=assay, dims.use = n.pcs, k.param=ceiling(0.5*sqrt(ncol(srobj.tmp))),
-                           resolution=set.res[1], save.SNN=T, plot.SNN=F,
-                           force.recalc=TRUE, verbose=FALSE)
+  srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[1], verbose=FALSE)
   
   res.that.work <- rep(T, length(set.res))
   for(i in 2:length(set.res)){
     tryCatch({
-      srobj.tmp = FindClusters(
-        srobj.tmp, assay=assay, resolution=set.res[i], reuse.SNN=TRUE, plot.SNN=FALSE, verbose=FALSE, force.recalc=FALSE)
+      srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[i], verbose=FALSE)
     }, error = function(e) {res.that.work[i] <<- F; message(paste("errored on", set.res[i], "Flagging as doesn't work"))})
     print(paste("          ", round(100*i/length(set.res)), "% done with parameter scan", sep=""))
   }
@@ -514,21 +527,25 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
   ######## step 3: output plot of how the resolution changes the number of clusters you get
   n.clusters = vector(mode="numeric", length=length(set.res))
   names(n.clusters) = set.res
+
   for(i in 1:length(n.clusters)){
     n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
   }
   
+
+
   ######## step 4: calculate the silhouette width for each resolution
   print("Computing a silhouette width for each cell, for each resolution...")
   require(cluster)
-  
   dist.temp = cor(t(srobj.tmp@reductions$pca@cell.embeddings[,n.pcs]), method="pearson")
   # consider changing to sampling 10% of each cluster, runs into issues calc silhouette score if there is only 1 cell in each cluster
   random.cells.choose = if ( nrow(dist.temp) > 500 ) sample(1:nrow(dist.temp), round(nrow(dist.temp)/10, digits=0)) else 1:nrow(dist.temp)
   dist.temp.downsample = dist.temp[random.cells.choose, random.cells.choose]
   sil.all.matrix = matrix(data=NA, nrow=nrow(dist.temp.downsample), ncol=0)
   
+
   for(i in 1:length(set.res)){
+    
     clusters.temp = as.numeric(as.vector(
       srobj.tmp@meta.data[random.cells.choose,paste0(assay, "_snn_res.", set.res[i])]))
     if(length(table(clusters.temp))>1){
@@ -577,7 +594,7 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
     
     print(paste0("Ouptutting summary statistics and returning seurat object... ",
                  "This will create a pdf in your output directory,",
-                 " and will return your input seurat object ammended with the best choice",
+                 " and will return your input seurat object amended with the best choice",
                  " for clusters (found as Best.Clusters in the meta.data matrix, and set to your new ident)..."))
     
     pdf(paste(figdir, "/", sample.name, ".pdf", sep=""),
