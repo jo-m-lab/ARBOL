@@ -6,16 +6,16 @@ Author: Benjamin Doran, Kyle Kimler
 Maintainer: The package maintainers <badoran@mit.edu> <kkimler@broadinstitute.org>
 Description: Iteratively clusters seurat object single cell datasets, choosing optimum resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage. 
 Depends:
-	R (>= 4.0.0)
-biocViews:
-Imports:
-    glmGamPoi,
-    Seurat,
+	R (>= 4.0.0),
+	Seurat,
     data.table,
     future,
     limma,
     ggplot2,
     dplyr
+biocViews:
+Imports:
+    glmGamPoi, 
 Remotes:
 	jo-m-lab/ARBOL
 License: GPL
