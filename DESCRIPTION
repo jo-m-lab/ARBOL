@@ -9,12 +9,13 @@ Depends:
 	R (>= 4.0.0)
 biocViews:
 Imports:
-	glmGamPoi,
-	tidyverse,
-	Seurat,
-	data.table,
-	future,
-	limma
+    glmGamPoi,
+    Seurat,
+    data.table,
+    future,
+    limma,
+    ggplot2,
+    dplyr
 Remotes:
 	jo-m-lab/ARBOL
 License: GPL
