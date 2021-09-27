@@ -10,8 +10,18 @@ that comprise that cluster.
 
 ## Install
 
+within R:
+```
+devtools::install_github('jo-m-lab/ARBOL')
+library(Seurat)
+library(ARBOL)
+```
+
+or clone the repository and source the functions directly from the script
 ```
 git clone https://github.com/jo-m-lab/ARBOL.git
+
+source("path/to/cloned/git/repo/R/ARBOL.R")
 ```
 
 ## Recommended Usage
@@ -33,8 +43,6 @@ inserted into the larger clustering steps.
 The main function of ARBOL is GenTieredClusters() - here is an example call
 
 ```
-source("path/to/cloned/git/repo/R/ARBOL.R")
-
 srobj <- readRDS("/path/to/full_seurat_object.rds")
 tiers <- GenTieredClusters(srobj,
                            saveSROBJdir = "~/tieredoutput/srobjs",
@@ -46,9 +54,7 @@ tiers <- GenTieredClusters(srobj,
 take a few hours. Running on 100k+ cells could take over a day. This timing varies
 based on the heterogeneity of your data.
 
-**Note** RAM is also a consideration, for running on ~100k cells, we routinely need to call on 128+GB of RAM. The current bottleneck is the SCTransform() call, which is run at each tier to renormalize to the input subset. 
-
-**Note** The script requires approximately 1.2 GB RAM per 1k cells, meaning on a local machine with 16GB RAM, one could reasonably run 12k cells. 
+**Note** The script requires approximately 1.2 GB RAM per 1k cells, meaning on a local machine with 16GB RAM, one could reasonably run 12k cells. The current RAM/time bottleneck is the SCTransform() call, which is run at each tier to renormalize to the input subset. 
 
 ## Params
 

@@ -439,7 +439,7 @@ Plotting <- function(working_srobj,fig_dir=NULL) {
     #' save basic cell counts
     cat(sprintf("Srobj: with %s genes & %s cells", nrow(working_srobj), ncol(working_srobj)),
         file = sprintf("%s/basic_counts.txt", fig_dir), sep="\n")
-    cat(sprintf("\n Choose %s PCs \n", working_srobj@misc$nPCs), file = sprintf("%s/basic_counts.txt", fig_dir), append = T)
+    cat(sprintf("\n Chose PC %s \n", working_srobj@misc$nPCs), file = sprintf("%s/basic_counts.txt", fig_dir), append = T)
     cat("\nTable of num cells per cluster:\n", file = sprintf("%s/basic_counts.txt", fig_dir), append = T)
     write.table(cell.num.per.clust, file = sprintf("%s/basic_counts.txt", fig_dir), row.names = F, append = T)  
      
