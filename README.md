@@ -24,9 +24,12 @@ git clone https://github.com/jo-m-lab/ARBOL.git
 source("path/to/cloned/git/repo/R/ARBOL.R")
 ```
 
+there is a docker image available with ARBOL and dependencies preinstalled
+https://hub.docker.com/r/kkimler/arbol
+
 ## Recommended Usage
 
-ARBOL was developed and use in the paper, "A treatment-naïve cellular atlas of pediatric Crohn’s disease predicts disease severity and therapeutic response"
+ARBOL was developed and used in the paper, "A treatment-naïve cellular atlas of pediatric Crohn’s disease predicts disease severity and therapeutic response"
 We include here a tutorial where the FGID atlas figure is reproduced: 
 https://jo-m-lab.github.io/ARBOL/ARBOLtutorial.html
 
@@ -35,10 +38,9 @@ This package is meant as a starting point for the way that we approached cluster
 We have dedicated effort to choosing reasonable defaults, but there is no certainty that they are
 the best defaults for your data.
 
-We recommend cloning the git repository, and looking directly at the
-`./R/ARBOL.R` script. We have tried to organize the script such that
+We recommend installing the repository through devtools. We have tried to organize the script such that
 each processing step is contained in a modular function that can be edited and
-inserted into the larger clustering steps.
+inserted into the main iterative function.
 
 The main function of ARBOL is GenTieredClusters() - here is an example call
 
