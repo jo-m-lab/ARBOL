@@ -1,10 +1,9 @@
 <img src="docs/ARBOLsmall.jpg?raw=true" align="right" width=500px>  
 
-Iteratively clusters single cell datasets using a Seurat v4 object as input. This method identifies and utilizes optimum 
+Iteratively cluster single cell datasets using a Seurat v4 object as input. This method identifies and utilizes optimum 
 cluster resolution parameters at each tier of clustering. It provides outputs of QC plots for each tier and stage.
 Furthermore, it can return output directories figs/ srobjs/ (see examples) containing subset 
-seurat objects and QC plots matching tiered structure of found in dataset.
-It can also return endclusts/ folder which contains tsv files named with the 
+seurat objects and QC plots. It can also return an endclusts/ folder which contains tsv files named with the 
 path to the endcluster (T0C0_T1C1.tsv) and containing the cellnames (one per line) 
 that comprise that cluster.
 
