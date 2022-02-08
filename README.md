@@ -64,13 +64,14 @@ based on the heterogeneity of your data.
 * *cells* cellnames if tiered clustering should start on subset of object
 * *tier* starting level defaults to 0
 * *clustN* cluster starting point. default to 0
-* *PreProcess_fun* function to use for preproccessing defaults to PreProcess_sctransform
+* *PreProcess_fun* function to use for preproccessing defaults to PreProcess_sctransform.  PreProcess_sctransform_harmony now available
 * *min_cluster_size* minimum number of cells to allow further clustering
 * *max_tiers* maximum number of tiers to allow further clustering
 * *EnoughDiffUp* minimum number of up-regulated genes to call clusters unique. Differential expression is performed when clustering finds 2 clusters
 * *EnoughDiffDown* minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped
 * *tierAllowedRecomb* minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low in their DE.
 * *ChooseOptimalClustering_fun* function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution
+* *harmony_var* variable over which to iterate harmony integration if using PreProcess_sctransform_harmony
 * *saveSROBJdir* where to save seurat objects for each tier and cluster, if null does not save
 * *figdir* where to save QC figures for each tier and cluster, if null does not save
 * *saveEndNamesDir* where to save directory of end clusters, if null does not save
