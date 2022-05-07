@@ -412,7 +412,6 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
   }
   #setting resolution choice to arbitrary number in case of error
   if (!is.null(srobj@reductions$harmony)) {
-    print('made it')
     nhvsave <- srobj@misc$nHVs
     resolution.choice = 1
     srobj@misc$resolution.choice = resolution.choice
@@ -425,7 +424,6 @@ ChooseOptimalClustering_default <- function(srobj, downsample_num = Inf,
           })
   }
   else {
-    print('you went here')
     npcsave <- srobj@misc$nPCs
     resolution.choice = 1
     srobj@misc$resolution.choice = resolution.choice

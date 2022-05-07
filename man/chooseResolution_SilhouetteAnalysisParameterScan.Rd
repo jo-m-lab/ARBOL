@@ -6,7 +6,7 @@
 \usage{
 chooseResolution_SilhouetteAnalysisParameterScan(
   input.srobj,
-  assay = "RNA",
+  assay = cluster_assay,
   n.pcs = input.srobj@misc$nPCs,
   sample.name = format(Sys.time(), "\%a-\%b-\%d-\%X-\%Y-\%Z"),
   res.low = 0.01,

@@ -20,7 +20,9 @@ GenTieredClusters(
   max_tiers = 10,
   EnoughDiffUp = 5,
   EnoughDiffDown = 5,
-  tierAllowedRecomb = 0
+  tierAllowedRecomb = 0,
+  harmony_var = NULL,
+  DownsampleNum = 7500
 )
 }
 \arguments{
@@ -34,7 +36,7 @@ GenTieredClusters(
 
 \item{clustN}{cluster starting from default to 0}
 
-\item{PreProcess_fun}{function to use for preproccessing defaults to PreProcess_sctransform}
+\item{PreProcess_fun}{function to use for preproccessing defaults to PreProcess_sctransform. PreProcess_sctransform_harmony now available.}
 
 \item{ChooseOptimalClustering_fun}{function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution}
 
@@ -52,7 +54,9 @@ GenTieredClusters(
 
 \item{EnoughDiffDown}{minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped. defaults to 5}
 
-\item{tierAllowedRecomb}{minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low in their DE.}
+\item{tierAllowedRecomb}{minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low.}
+
+\item{harmony_var}{variable over which to iterate harmony integration}
 
 \item{saveEndNamesDir}{where to save directory of end clusters, if null does not save}
 }

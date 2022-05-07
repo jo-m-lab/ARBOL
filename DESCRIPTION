@@ -3,8 +3,9 @@ Type: Package
 Title: ARBOL: Tiered Clustering of Single Cell Data
 Version: 3.0.0
 Author: Benjamin Doran, Kyle Kimler
-Maintainer: The package maintainers <badoran@mit.edu> <kkimler@broadinstitute.org>
+Maintainer: The package maintainer <kkimler@broadinstitute.org>
 Description: Iteratively clusters seurat object single cell datasets, choosing optimum resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage. 
+biocViews:
 Depends:
 	R (>= 4.0.0),
 	Seurat,
@@ -12,10 +13,26 @@ Depends:
     future,
     limma,
     ggplot2,
-    dplyr
-biocViews:
-Imports:
-    glmGamPoi, 
+    dplyr,
+    pvclust,
+    harmony,
+    vegan,
+    reshape2,
+    Matrix,
+    Matrix.utils,
+    ggfortify,
+    ggpubr,
+    ggrepel,
+    tidygraph,
+    ggraph,
+    data.tree,
+    ape,
+    phyloseq,
+	ggalluvial,
+	scatterpie,
+	ggnewscale,
+	glmGamPoi,
+	strex
 Remotes:
 	jo-m-lab/ARBOL
 License: GPL
