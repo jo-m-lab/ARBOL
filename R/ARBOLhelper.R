@@ -172,7 +172,6 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
     jointb <- meta2 %>% 
         group_by(tierNident) %>%
         mutate(n = n()) %>% 
-        left_join(tierNpresence, by='tierNident') %>%
         dplyr::select(CellID,sample,tierNident,sample_diversity,n) %>% 
         summarize(ids = list(CellID),samples = list(unique(sample)),
                     diversity=unique(sample_diversity),n=unique(n))
