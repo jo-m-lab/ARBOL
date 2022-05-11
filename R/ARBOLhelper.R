@@ -140,6 +140,7 @@ SIperIDs <- function(df, group) {
     return(diversity(tierNwide,'simpson'))
 }
 
+
 #' Prepare ARBOL seurat object metadata for tree building
 #' @param srobj a seurat object with ARBOL 'tierNident' and 'sample' columns
 #' @param maxtiers max_tiers parameter used in ARBOL
@@ -149,23 +150,11 @@ SIperIDs <- function(df, group) {
 #' @export
 prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
     meta <- srobj@meta.data
-    meta <- meta %>% separate(tierNident,into=paste0('tier',seq(1,maxtiers)),remove=F)
-    meta$tier0 <- 'T0C0'
 
-    for(x in seq(1,maxtiers)) {
-        meta <- meta %>% mutate(tierfull = strex::str_before_nth(tierNident, '\\.', n=x))
-        meta$tierfull[!grepl(paste0('T',x),meta$tierfull)] <- NA
-        names(meta)[names(meta) == 'tierfull'] <- paste0('tier',x,'full')
-    }
-
-    meta2 <- meta %>% unite('pathString', tier0, tier1full, tier2full,tier3full,
-                             tier4full,tier5full,tier6full,tier7full,tier8full,tier9full,tier10full, sep = "/", na.rm = TRUE)
+    meta <- spread_tierN(meta,max_tiers=maxtiers)
 
     #make sure sample metadata column exists
     if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
-
-    tierNcount <- meta2 %>%
-        dplyr::count(sample,tierNident)
 
     meta2 <- meta2 %>% left_join(SIperGroup(srobj@meta.data, species=tierNident, group='sample')) %>% suppressMessages
 
@@ -188,7 +177,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
 #' @examples
 #' prepARBOLmeta_tree(srobj, maxtiers=10)
 #' @export
-prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attributes = 'samples', diversity_attributes = 'sample') {
+prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attributes, diversity_attributes = 'sample') {
 
     #calculate number of children per node
     ARBOLtree$Do(function(node) node$numChildren <- node$children %>% length)
@@ -196,11 +185,22 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attribu
     #calculate total n samples for diversity propagation
     totalsamples <- srobj@meta.data$sample %>% unique %>% length
 
+    #propagate node size up tree
+    ARBOLtree$Do(function(node) node[['n']] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+
+    #propagate additional numerical variables
     for (y in numerical_attributes){
         ARBOLtree$Do(function(node) node[[y]] <- ifelse(is.na(node[[y]]) & node[['numChildren']]==0,0,node[[y]]))
         ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
     }
 
+    #propagate list of cell barcodes per node up the tree
+    ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+    #also samples. introducing this line to the function enforces "sample" column in srobj metadata
+    ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+
+
+    #propagate additional categorical variables
     for (y in categorical_attributes) {
         ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
     }
@@ -208,6 +208,7 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attribu
     #make samples only unique values
     ARBOLtree$Do(function(node) node$samples <- unique(unlist(node$samples)))
 
+    #calculate diversity attributes per node
     for (y in diversity_attributes) {
         ARBOLtree$Do(function(node) {ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
                                 node[[sprintf('%s_diversity',y)]] <- SIperIDs(meta, group=y)
@@ -264,34 +265,34 @@ sr_binarytree <- function(srobj,assay='SCT') {
 
 #' Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it
 #' calls prepARBOLmeta_tree() and prepTree()
-#' @param srobj a seurat object with ARBOL 'tierNident' and 'sample' columns. 
-#' @return the input seurat object with tiered clustering tree in srobj@@misc$pvclust and ggraph of tree to srobj@@misc$ARBOLclustertreegraph
+#' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', and 'sample' columns. 
+#' @param diversity_attributes columns in metadata for which you wish to calculate diversity per node 
+#' @return the input seurat object with tiered clustering tree in srobj@@misc$ARBOLclustertree, 
+#' plot of tree to srobj@@misc$ARBOLclustertreeviz, and ggraph object to srobj@@misc$ARBOLclustertreeggraph
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj) {
+sr_ARBOLclustertree <- function(srobj, diversity_attributes = 'sample') {
+
   treemeta <- prepARBOLmeta_tree(srobj)
 
   ARBOLtree <- as.Node(treemeta) 
 
-  Atree <- prepTree(ARBOLtree)
+  srobj <- tierN_SI(srobj, diversity_attributes = diversity_attributes)
 
-  #create dataframe from the resulting annotation-propagated tree, including internal nodes
-  ARBOLdf <- ToDataFrameTree(Atree,  "tier1", 'diversity', 'disease_diversity', 'n', 'pathString')
+  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversity_attributes)
 
-  #remove graphics from levelName column
-  ARBOLdf$levelName <- ARBOLdf$levelName %>% str_replace_all(' ','') %>% str_replace_all('-','') %>%
-                          str_replace_all('¦','') %>% str_replace_all('°','')
+  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
 
-  #add a row index column for joining with ggraph object                        
-  ARBOLdf$i <- as.numeric(row.names(ARBOLdf))
+  #simple code call of translation to df disallowing custom diversity_attributes
+  #ARBOLdf <- preppedTree_toDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
 
   ARBOLphylo <- as.phylo(ARBOLtree)
   #for original ARBOL clustering tree, set all edge lengths to 1
   ARBOLphylo$edge.length <- rep(1,ARBOLphylo$edge.length %>% length)
 
   #convert to tbl_graph object to allow easy plotting with ggraph
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=levelName,tier1,diversity,n))
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=levelName,tier1,sample_diversity,n))
   x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i,tier1))
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
 
@@ -301,17 +302,102 @@ sr_ARBOLclustertree <- function(srobj) {
   geom_edge_elbow() + geom_node_point(size=0.3)
 
   srobj@misc$ARBOLclustertree <- Atree
-  srobj@misc$ARBOLclustertreegraph <- bt0
+  srobj@misc$ARBOLclustertreeviz <- bt0
+  srobj@misc$ARBOLclustertreeggraph <- x
 
   return(srobj)
 }
+
+#' Creates binary tree object for ARBOL run, adds it to seurat object along with a graph of it
+#' calls sr_binarytree() in which assay + methods for tree building are called
+#' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
+#' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
+#' bina
+#' @examples
+#' srobj <- sr_ARBOLbinarytree(srobj)
+#' @export
+sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
+  
+  srobj <- sr_binarytree(srobj)
+
+  binarydf <- bintree.to.df(pvclust_tree=srobj@misc$pvclust)
+
+  srobj <- tierN_SI(srobj, diversity_attributes = diversity_attributes)
+
+  jointb <- srobj@meta.data %>% 
+      group_by(tierNident) %>%
+      mutate(n = n()) %>% 
+      dplyr::select(CellID,sample,tier1,tierNident,sample_diversity,n) %>% summarize(ids = list(CellID),
+          samples = list(unique(sample)),sample_diversity=unique(sample_diversity), 
+          n=unique(n),tier1=unique(tier1))
+
+  finaltreedf <- binarydf %>% left_join(jointb)
+
+  divtree <- as.Node(finaltreedf)
+
+  divtree <- prepTree(divtree,srobj=tsr, categorical_attributes = 'tier1', 
+    diversity_attributes = c('sample_diversity','disease_diversity'))
+
+  ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
+
+  txt <- ToNewick(divtree)
+
+  ARBOLphylo <- ape::read.tree(text=txt)
+
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=pathString,tier1,sample_diversity,n)) %>%
+  mutate(nFGID = n-nCD)
+  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i,tier1))
+  x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
+  x <- x %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.','')) 
+
+  bt0 <- ggraph(x, layout = 'dendrogram') +
+  geom_edge_elbow() + 
+  geom_node_point(aes(label=string),size=0) + 
+#  geom_node_text(aes(filter = leaf, label = name, angle=90),nudge_y=-2,vjust=0.5,hjust=1.01) + 
+  geom_node_text(aes(filter = leaf, label = n, angle=90),color='grey30',nudge_y=-0.7,vjust=0.5,hjust=1.01,size=3) + 
+  theme_classic()
+
+  srobj@misc$binarytree <- divtree
+  srobj@misc$binarytreeviz <- bt0
+  srobj@misc$binarytreeggraph <- x
+
+  return(srobj)
+}
+
+#' Merges tierNidents with their nearest neighbors in a binary tree if their sample diversity and number of cells do not meet thresholds
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
+#' @examples
+#' srobj <- MergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
+#' @export
+MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
+  
+  Prune(srobj@misc$binarytree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
+  Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
+
+  #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
+  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1))
+
+  divtestdf <- data.frame(ToDataFrameTable(srobj@misc$binarytree, "pathString", 'ids', 'tierNident','sample_diversity'))
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
+  divdf2 <- divdf2 %>% distinct
+
+  divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
+  divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
+
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdif2 %>% select(CellID,mergedIdent=binIdent))
+
+  return(srobj)
+}
+
+
 
 #' Converts pvclust tree object to dataframe with row per node
 #' calls prepARBOLmeta_tree() and prepTree()
 #' @param pvclust_tree a pvclust or hclust tree 
 #' @return a dataframe with one row per node of the tree
 #' @examples
-#' binarydf <- bintree.to.df(pvclust_tree=tsr@@misc$pvclust)
+#' binarydf <- bintree.to.df(pvclust_tree=srobj@@misc$pvclust)
 #' @export
 bintree.to.df <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
@@ -334,7 +420,7 @@ bintree.to.df <- function(pvclust_tree) {
 #' left_join(ARBOLdf %>% select(name=pathString,sample_diversity,disease_diversity))
 #' @export
 preppedTree_toDF <- function(tree, ...) {
-    ARBOLdf <- ToDataFrameTree(divtree, ...)
+    ARBOLdf <- ToDataFrameTree(tree, ...)
 
     #remove graphics from levelName column
     ARBOLdf$levelName <- ARBOLdf$levelName %>% str_replace_all(' ','') %>% str_replace_all('-','') %>%
@@ -368,17 +454,17 @@ tierN_SI <- function(srobj, diversity_attributes) {
 #' srobj@@meta.data <- spread_tierN(srobj@@meta.data)
 #' @export
 spread_tierN <- function(df, max_tiers = 10) {
-    df <- df %>% separate(tierNident,into=paste0('tier',seq(1,maxtiers)),remove=F)
+    df <- df %>% separate(tierNident,into=paste0('tier',seq(1,max_tiers)),remove=F)
     df$tier0 <- 'T0C0'
 
-    for(x in seq(1,maxtiers)) {
+    for(x in seq(1,max_tiers)) {
         df <- df %>% mutate(tierfull = strex::str_before_nth(tierNident, '\\.', n=x))
         df$tierfull[!grepl(paste0('T',x),df$tierfull)] <- NA
         names(df)[names(df) == 'tierfull'] <- paste0('tier',x,'full')
     }
 
-    df2 <- df %>% unite('pathString', tier0, tier1full, tier2full,tier3full,
-                             tier4full,tier5full,tier6full,tier7full,tier8full,tier9full,tier10full, sep = "/", na.rm = TRUE)
+    df2 <- df %>% unite('pathString', tier0:!!paste0('tier',max_tiers,'full'), sep = "/", na.rm = TRUE, remove = FALSE)
+
     return(df2)
 }
 

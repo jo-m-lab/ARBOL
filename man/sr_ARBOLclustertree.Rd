@@ -5,13 +5,16 @@
 \title{Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it
 calls prepARBOLmeta_tree() and prepTree()}
 \usage{
-sr_ARBOLclustertree(srobj)
+sr_ARBOLclustertree(srobj, diversity_attributes = "sample")
 }
 \arguments{
-\item{srobj}{a seurat object with ARBOL 'tierNident' and 'sample' columns.}
+\item{srobj}{a seurat object with ARBOL 'tierNident', 'CellID', and 'sample' columns.}
+
+\item{diversity_attributes}{columns in metadata for which you wish to calculate diversity per node}
 }
 \value{
-the input seurat object with tiered clustering tree in srobj@misc$pvclust and ggraph of tree to srobj@misc$ARBOLclustertreegraph
+the input seurat object with tiered clustering tree in srobj@misc$ARBOLclustertree, 
+plot of tree to srobj@misc$ARBOLclustertreeviz, and ggraph object to srobj@misc$ARBOLclustertreeggraph
 }
 \description{
 Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it

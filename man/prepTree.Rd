@@ -8,7 +8,7 @@ prepTree(
   ARBOLtree,
   srobj,
   numerical_attributes,
-  categorical_attributes = "samples",
+  categorical_attributes,
   diversity_attributes = "sample"
 )
 }

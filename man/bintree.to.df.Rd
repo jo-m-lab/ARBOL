@@ -18,5 +18,5 @@ Converts pvclust tree object to dataframe with row per node
 calls prepARBOLmeta_tree() and prepTree()
 }
 \examples{
-binarydf <- bintree.to.df(pvclust_tree=tsr@misc$pvclust)
+binarydf <- bintree.to.df(pvclust_tree=srobj@misc$pvclust)
 }
