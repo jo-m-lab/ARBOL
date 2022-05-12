@@ -156,18 +156,18 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
     #make sure sample metadata column exists
     if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
 
-    meta2 <- meta2 %>% left_join(SIperGroup(srobj@meta.data, species=tierNident, group='sample')) %>% suppressMessages
+    meta <- meta %>% left_join(SIperGroup(srobj@meta.data, species=tierNident, group='sample')) %>% suppressMessages
 
-    jointb <- meta2 %>% 
+    jointb <- meta %>% 
         group_by(tierNident) %>%
         mutate(n = n()) %>% 
         dplyr::select(CellID,sample,tierNident,sample_diversity,n) %>% 
         summarize(ids = list(CellID),samples = list(unique(sample)),
                     diversity=unique(sample_diversity),n=unique(n))
 
-    meta3 <- meta2 %>% left_join(jointb)
+    treemeta <- meta %>% left_join(jointb)
       
-    return(meta3)
+    return(treemeta)
 }
 
 #' Prepare ARBOL seurat object metadata for tree building
@@ -177,7 +177,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
 #' @examples
 #' prepARBOLmeta_tree(srobj, maxtiers=10)
 #' @export
-prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attributes, diversity_attributes = 'sample') {
+prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample') {
 
     #calculate number of children per node
     ARBOLtree$Do(function(node) node$numChildren <- node$children %>% length)
@@ -186,25 +186,28 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attribu
     totalsamples <- srobj@meta.data$sample %>% unique %>% length
 
     #propagate node size up tree
-    ARBOLtree$Do(function(node) node[['n']] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+    ARBOLtree$Do(function(node) node[['n']] <- Aggregate(node, attribute = 'n', aggFun = sum), traversal = "post-order")
 
     #propagate additional numerical variables
-    for (y in numerical_attributes){
-        ARBOLtree$Do(function(node) node[[y]] <- ifelse(is.na(node[[y]]) & node[['numChildren']]==0,0,node[[y]]))
-        ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+    if(!is.na(numerical_attributes)) {                     
+        for (y in numerical_attributes){
+            ARBOLtree$Do(function(node) node[[y]] <- ifelse(is.na(node[[y]]) & node[['numChildren']]==0,0,node[[y]]))
+            ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+        }
     }
-
     #propagate list of cell barcodes per node up the tree
-    ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+    ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
     #also samples. introducing this line to the function enforces "sample" column in srobj metadata
-    ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+    ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
 
 
     #propagate additional categorical variables
-    for (y in categorical_attributes) {
-        ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+    if(!is.na(categorical_attributes)) { 
+        for (y in categorical_attributes) {
+            ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+        }
     }
-
+                         
     #make samples only unique values
     ARBOLtree$Do(function(node) node$samples <- unique(unlist(node$samples)))
 
@@ -221,6 +224,7 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attribu
     return(ARBOLtree)
 }
 
+
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
 #' @param srobj a seurat object with ARBOL 'tierNident' column
@@ -231,9 +235,9 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes, categorical_attribu
 #' @export
 sr_binarytree <- function(srobj,assay='SCT') {
     srobj_meta <- srobj@meta.data
-    scaled.data.mtx <- Matrix(t(srobj[[assay]]@data),sparse=TRUE)
+    scaled.data.mtx <- Matrix(as.matrix(t(srobj[[assay]]@data)),sparse=TRUE)
         #pull seurat object's cell ID + tierNident
-    t2 <- srobj_meta[,c('CellID','tierNident')] #%>% column_to_rownames('CellID')
+    t2 <- srobj_meta[,c('CellID','tierNident')]
     #create numerical representation of tierNident per ident 
     t3 <- data.frame(tierNident=t2$tierNident %>% unique,i = seq(1:length(unique(t2$tierNident))))
     #place numerical representation in cell matrix t2
@@ -299,7 +303,7 @@ sr_ARBOLclustertree <- function(srobj, diversity_attributes = 'sample') {
   bt0 <- ggraph(x, layout = 'tree', circular=T) + 
   #color branches and nodes by type or tier1 (must propagate this metadata in prepTree)
     #geom_edge_elbow(aes(colour=factor(tier1))) + geom_node_point(aes(colour = tier1))
-  geom_edge_elbow() + geom_node_point(size=0.3)
+  geom_edge_diagonal() + geom_node_point(size=0.3)
 
   srobj@misc$ARBOLclustertree <- Atree
   srobj@misc$ARBOLclustertreeviz <- bt0
@@ -335,8 +339,8 @@ sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
 
   divtree <- as.Node(finaltreedf)
 
-  divtree <- prepTree(divtree,srobj=tsr, categorical_attributes = 'tier1', 
-    diversity_attributes = c('sample_diversity','disease_diversity'))
+  divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = 'tier1', 
+    diversity_attributes = diversity_attributes)
 
   ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
 
@@ -344,8 +348,7 @@ sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
 
   ARBOLphylo <- ape::read.tree(text=txt)
 
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=pathString,tier1,sample_diversity,n)) %>%
-  mutate(nFGID = n-nCD)
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=pathString,tier1,sample_diversity,n)) 
   x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i,tier1))
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
   x <- x %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.','')) 
@@ -385,7 +388,7 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
   divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdif2 %>% select(CellID,mergedIdent=binIdent))
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent))
 
   return(srobj)
 }
