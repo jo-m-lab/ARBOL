@@ -235,7 +235,7 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
 #' @export
 sr_binarytree <- function(srobj,assay='SCT') {
     srobj_meta <- srobj@meta.data
-    scaled.data.mtx <- Matrix(as.matrix(t(srobj[[assay]]@data)),sparse=TRUE)
+    scaled.data.mtx <- Matrix(t(as.matrix(srobj[[assay]]@data)),sparse=TRUE)
         #pull seurat object's cell ID + tierNident
     t2 <- srobj_meta[,c('CellID','tierNident')]
     #create numerical representation of tierNident per ident 
