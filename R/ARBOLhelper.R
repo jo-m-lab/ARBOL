@@ -255,7 +255,7 @@ sr_binarytree <- function(srobj,assay='SCT') {
     clst.cntrs <- agg.clst.cntrs
 
     #transpose cluster centers dataframe
-    g <- clst.cntrs %>% t %>% data.frame
+    g <- clst.cntrs %>% as.matrix %>% t %>% data.frame
 
     #remember actual tierNident names
     colnames(g) <- t3$tierNident
