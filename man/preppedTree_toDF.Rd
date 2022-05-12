@@ -19,7 +19,7 @@ Used in ARBOL workflow to create a tbl_graph object, a class useful for plotting
 }
 \examples{
 ARBOLdf <- preppedTree_toDF(divtree)
-txt <- ToNewick(divtree)
+txt <- ARBOL::ToNewickPS(divtree)
 ARBOLphylo <- ape::read.tree(text=txt)
 
 x <- as_tbl_graph(ARBOLphylo, directed=T) \%>\% activate(nodes) \%>\% 

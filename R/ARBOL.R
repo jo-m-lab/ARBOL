@@ -319,7 +319,8 @@ PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig
 #'
 #' Also saves plots describing PC choice
 #'
-#' @examples nPCs <- ChoosePCs_default(srobj, figure_dir=fig_dir)
+#' @examples 
+#' nPCs <- ChoosePCs_default(srobj, figure_dir=fig_dir)
 #' 
 #' @param srobj v4 seurat object
 #' @param improved_diff_quantile percent variance explained of next PC to choose PC

@@ -13,43 +13,45 @@
 
 #loadpak(packages)
 
-#' makes data.tree names unique
-#' @param l A data tree object
-#' @return a data tree object with names forced to be unique. Useful when producing node-level dataframes from raw data tree objects
+#' data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. 
+#' @param node A data tree object
+#' @return Newick format tree
 #' @examples
-#' makeDataTreeNamesUnique(ARBOLtree)
+#' txt <- ToNewickPS(divtree)
+#' ARBOLphylo <- ape::read.tree(text=txt)
 #' @export
-makeDataTreeNamesUnique <- function(l) {
-  l.names <- names(l$children)
-  # multiple children types
-  tab <- table(l.names)
-  t.names <- names(tab)
+#' Functions for data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. 
+#' This is useful when node names are redundant throughout a tree, which happens in binary tree calculation with pvclust
 
-  # iterate over types
-  for(this.type in seq_along(t.names)) {
-    # iterate over duplicate names
-    # get an index to this type
-    idx <- which(l.names == t.names[this.type])
-    for(this.element in seq_along(idx)) {
-      # make a copy of this chunk of the tree
-      l.sub <- l$Children[[idx[this.element]]]
-      # if this is a terminal leaf then re-name and continue
-      if(is.null(l.sub$Children)) {
-        # print('leaf')
-        names(l$Children)[idx[this.element]] <- paste0(t.names[this.type], '_', this.element)
-      }
-      # otherwise re-name and then step into this element and apply this function recursively
-      else {
-        # print('branch')
-        names(l$Children)[idx[this.element]] <- paste0(t.names[this.type], '_', this.element)
-        # fix this branch and splice back into tree
-        l$Children[[idx[this.element]]] <- makeNamesUnique(l.sub)
-      }
+ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
+
+  deparse <- function(x) {
+    name <- stringi::stri_replace_all_fixed(x$pathString, " ", "_")
+    name <- stringi::stri_replace_all_fixed(name, ",", "")
+    if(!isRoot(x) && length(heightAttribute) > 0) {
+      edge <- GetAttribute(x$parent, heightAttribute, ...) - GetAttribute(x, heightAttribute, ...) 
+      me <- paste0(name, ":", edge)
+    } else {
+      me <- name
     }
+    return(me)
   }
-
-  return(l)
+  
+  Newick <- function(x) {
+    if(x$isLeaf) {
+      return (deparse(x))
+    }
+    chNewick <- sapply(x$children, Newick)
+    chNewickStr <- paste(chNewick, collapse = ",")
+    res <- paste0("(", chNewickStr, ")", deparse(x))
+  }
+  
+  res <- Newick(node)
+  res <- paste0(res, ";")
+  return (res)
+  
 }
+
 
 #' Load 'endclusters' folder from R ARBOL output as a dataframe
 #' @param folder R ARBOL endclusts folder
@@ -344,7 +346,7 @@ sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
 
   ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
 
-  txt <- ToNewick(divtree)
+  txt <- ToNewickPS(divtree)
 
   ARBOLphylo <- ape::read.tree(text=txt)
 
@@ -416,7 +418,7 @@ bintree.to.df <- function(pvclust_tree) {
 #' @return a dataframe of the tree with one row per node
 #' @examples
 #' ARBOLdf <- preppedTree_toDF(divtree)
-#' txt <- ToNewick(divtree)
+#' txt <- ARBOL::ToNewickPS(divtree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' 
 #' x <- as_tbl_graph(ARBOLphylo, directed=T) %>% activate(nodes) %>% 
@@ -464,8 +466,6 @@ spread_tierN <- function(df, max_tiers = 10) {
     df$tierNident <- paste0(df$tierNident,'.')
 
     for(x in seq(1,max_tiers)) {
-
-      #edge case! last tier isn't working
         df <- df %>% mutate(tierfull = strex::str_before_nth(tierNident, '\\.', n=x))
         df$tierfull[!grepl(paste0('T',x),df$tierfull)] <- NA
         names(df)[names(df) == 'tierfull'] <- paste0('tier',x,'full')
