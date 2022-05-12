@@ -460,11 +460,19 @@ spread_tierN <- function(df, max_tiers = 10) {
     df <- df %>% separate(tierNident,into=paste0('tier',seq(1,max_tiers)),remove=F)
     df$tier0 <- 'T0C0'
 
+    #add delimiter to end of tierNident to allow programmatic parsing!
+    df$tierNident <- paste0(df$tierNident,'.')
+
     for(x in seq(1,max_tiers)) {
+
+      #edge case! last tier isn't working
         df <- df %>% mutate(tierfull = strex::str_before_nth(tierNident, '\\.', n=x))
         df$tierfull[!grepl(paste0('T',x),df$tierfull)] <- NA
         names(df)[names(df) == 'tierfull'] <- paste0('tier',x,'full')
     }
+
+    #remove delimiter
+    df$tierNident = substr(df$tierNident,1,nchar(df$tierNident)-1)
 
     df2 <- df %>% unite('pathString', tier0:!!paste0('tier',max_tiers,'full'), sep = "/", na.rm = TRUE, remove = FALSE)
 
