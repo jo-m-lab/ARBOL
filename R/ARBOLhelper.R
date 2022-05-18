@@ -479,3 +479,74 @@ spread_tierN <- function(df, max_tiers = 10) {
     return(df2)
 }
 
+#' Calculate curated names for set of clusters as function of their major type
+#' @param srobj a seurat object with metadata columns 'celltype' and 'tierNident' i.e. srobj@@meta.data$celltype
+#' @param figdir the figdir from an GenTieredClusters (ARBOL) run 
+#' @param max_cells_per_ident maximum cells to use in FindAllMarkers call. defaults to 200
+#' @return the seurat object with curatedname column in metadata
+#' @examples
+#' srobj <- GetStandardNames(srobj,figdir='ARBOLoutput/figs')
+#' @export
+
+GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200) {
+
+  Idents(srobj) <- srobj@meta.data$celltype
+  typeobjs <- SplitSrobjOnMeta(srobj, meta="celltype",'typeobjects')
+
+  if(!file.exists(sprintf('%s/curatedtypeAmongtype1markers.rds',figdir))) {
+    CuratedtypeAmongType1markers <- lapply(typeobjs,function(obj) {
+          if (obj@meta.data$tierNident %>% unique %>% length > 1){
+              Idents(obj) <- obj@meta.data$tierNident;
+              tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+               return(tmp)
+              }
+          else {
+              return(data.frame())
+          }})
+    saveRDS(CuratedtypeAmongType1markers,sprintf('%s/curatedtypeAmongtype1markers.rds',figdir))
+  }
+  else(
+    CuratedtypeAmongType1markers <- readRDS(sprintf('%s/curatedtypeAmongtype1markers.rds',figdir))
+  )
+
+  t <- lapply(CuratedtypeAmongType1markers,function(listmarkers,objs) {
+        tryCatch({
+                biomarkers <- listmarkers %>%
+              mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(avg_logFC, as.numeric) * 
+                      (pct.1 / (pct.2 + 1e-300))) %>%
+                        group_by(cluster) %>% top_n(2, wt=rnkscr) %>% 
+                        arrange(cluster, desc(rnkscr));
+
+                lapply(seq_along(biomarkers$gene), function(x) 
+                  paste(biomarkers$gene[x], biomarkers$gene[x+1],sep='.')) %>% unlist -> top2biomarkers
+                  top2biomarkers <- top2biomarkers[seq(1,length(top2biomarkers),2)]
+                  biomarkers$markers <- rep(top2biomarkers,each=2)
+                  endname <- biomarkers %>% select(cluster,markers) %>% summarise_each(funs(max))
+                  return(endname)
+                     },
+               error = function(e) {
+
+               })
+             })
+
+  suppressWarnings(bind_rows(t,.id='type_id') -> markersAsList)
+  message('number of end clusters for which at least two biomarkers were found: ',
+       length(markersAsList$cluster))
+  message('total number of end clusters: ',length(unique(srobj@meta.data$tierNident)))
+  markersAsList <- markersAsList %>% rename(tierNident=cluster)
+  srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident") %>% 
+  mutate(curatedname = paste(celltype,markers,sep='.'))
+  return(srobj)
+}
+
+
+
+
+
+
+
+
+
+
+
+
