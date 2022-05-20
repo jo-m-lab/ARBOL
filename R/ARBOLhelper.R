@@ -328,7 +328,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'tier1', diversities = 'sampl
 
   binarydf <- bintree.to.df(pvclust_tree=srobj@misc$pvclust)
 
-  srobj <- tierN_SI(srobj, diversity_attributes = diversity_attributes)
+  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
 
   jointb <- srobj@meta.data %>% 
       group_by(tierNident) %>%
@@ -344,7 +344,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'tier1', diversities = 'sampl
   divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities)
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
+  ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversities,'_diversity')))
 
   txt <- ToNewickPS(divtree)
 
