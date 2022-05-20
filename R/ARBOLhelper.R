@@ -278,17 +278,17 @@ sr_binarytree <- function(srobj,assay='SCT') {
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, diversity_attributes = 'sample') {
+sr_ARBOLclustertree <- function(srobj, diversities = 'sample') {
 
   treemeta <- prepARBOLmeta_tree(srobj)
 
   ARBOLtree <- as.Node(treemeta) 
 
-  srobj <- tierN_SI(srobj, diversity_attributes = diversity_attributes)
+  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
 
-  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversity_attributes)
+  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities)
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
+  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'tier1','n','pathString',paste0(diversities,'_diversity')))
 
   #simple code call of translation to df disallowing custom diversity_attributes
   #ARBOLdf <- preppedTree_toDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
