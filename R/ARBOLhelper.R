@@ -197,11 +197,11 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
             ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
         }
     }
+
     #propagate list of cell barcodes per node up the tree
     ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
     #also samples. introducing this line to the function enforces "sample" column in srobj metadata
     ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
-
 
     #propagate additional categorical variables
     if(!is.na(categorical_attributes)) { 
@@ -320,9 +320,9 @@ sr_ARBOLclustertree <- function(srobj, diversity_attributes = 'sample') {
 #' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
 #' bina
 #' @examples
-#' srobj <- sr_ARBOLbinarytree(srobj)
+#' srobj <- sr_ARBOLbinarytree(srobj, categories = c('tier1','type','disease'))
 #' @export
-sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
+sr_ARBOLbinarytree <- function(srobj, categories = 'tier1', diversities = 'sample') {
   
   srobj <- sr_binarytree(srobj)
 
@@ -341,8 +341,8 @@ sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
 
   divtree <- as.Node(finaltreedf)
 
-  divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = 'tier1', 
-    diversity_attributes = diversity_attributes)
+  divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
+    diversity_attributes = diversities)
 
   ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversity_attributes,'_diversity')))
 
@@ -376,7 +376,8 @@ sr_ARBOLbinarytree <- function(srobj, diversity_attributes = 'sample') {
 #' srobj <- MergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
 #' @export
 MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
-  
+
+  #DataTree::Prune chops all nodes that don't meet a threshold
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
 
