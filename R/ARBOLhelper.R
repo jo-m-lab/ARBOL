@@ -214,6 +214,8 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
     if(!is.na(categorical_attributes)) { 
         for (y in categorical_attributes) {
             ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
+            ARBOLtree$Do(function(node) node[[y]] <- unique(node[[y]]))
+            ARBOLtree$Do(function(node) node[[sprintf('%s_majority',y)]] <- names(which.max(table(unlist(node[[y]])))))
         }
     }
                          
@@ -356,7 +358,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
             dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
 
-  categorydf <- jointb %>% summarize(across(categories, ~ list(paste(unique(.x),collapse=', '))))
+  categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),',')))
   divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
 
   jointb <- jointb %>% select(-all_of(categories)) %>% 
