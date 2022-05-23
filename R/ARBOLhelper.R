@@ -382,17 +382,34 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   x <- x %>% activate(nodes) %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
 
-  bt0 <- ggraph(test2@misc$binarytreeggraph, layout = 'dendrogram') +
-    geom_edge_elbow() + 
-    geom_node_point(size=0) + 
-    geom_node_text(aes(filter = leaf, label = name, fill = tier1), nudge_y=-0.75,vjust=0.5,hjust=1.01) + 
-    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3) +
-    theme_void() +
-    geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + scale_color_gradient(low='grey90',high='grey10') +
-    expand_limits(y=-5)
+  if(exists(x$type)) {
+    bt0 <- ggraph(x, layout = 'dendrogram') +
+      geom_edge_elbow() + 
+      geom_node_point(size=0) + 
+      geom_node_text(aes(filter = leaf, label = name, fill = tier1), nudge_y=-0.75,vjust=0.5,hjust=1.01) + 
+      geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3) +
+      theme_void() +
+      geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + scale_color_gradient(low='grey90',high='grey10') +
+      expand_limits(y=-5)
+
+    srobj@misc$binarytreeviz <- bt0
+  }
+
+  else {
+    bt1 <- ggraph(x, layout = 'dendrogram') +
+      geom_edge_elbow() + 
+      geom_node_point(size=0) + 
+      geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01) + 
+      geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3) +
+      theme_void() +
+      geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + scale_color_gradient(low='grey90',high='grey10') +
+      expand_limits(y=-5)
+
+    srobj@misc$binarytreeviz <- bt1
+  }
 
   srobj@misc$binarytree <- divtree
-  srobj@misc$binarytreeviz <- bt0
+  
   srobj@misc$binarytreeggraph <- x
 
   return(srobj)
