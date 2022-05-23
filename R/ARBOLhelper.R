@@ -167,11 +167,8 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
     jointb <- jointb %>% select(-all_of(categorical_attributes)) %>% 
                 summarize(ids = list(CellID),n=unique(n))
 
-    finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf)
+    treemeta <- meta %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf)
     
-
-    treemeta <- meta %>% left_join(jointb)
-      
     return(treemeta)
 }
 
