@@ -156,11 +156,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categories,diversities) {
     meta <- spread_tierN(meta,max_tiers=maxtiers)
 
     #make sure sample metadata column exists
-    if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
-
-    for(z in diversities) {
-        meta <- meta %>% left_join(SIperGroup(meta, species=tierNident, group=z)) %>% suppressMessages
-    }
+    #if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
 
     jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
           dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
@@ -296,12 +292,12 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
   if (!is.element('sample',categories)) {
     categories = c('sample',categories)
   }
+
+  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
   
   treemeta <- prepARBOLmeta_tree(srobj, categories = categories, diversities = diversities)
 
   ARBOLtree <- as.Node(treemeta) 
-
-  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
 
   Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities)
 
