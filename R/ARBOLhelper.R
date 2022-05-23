@@ -150,7 +150,7 @@ SIperIDs <- function(df, group) {
 #' @examples
 #' prepARBOLmeta_tree(srobj, maxtiers=10)
 #' @export
-prepARBOLmeta_tree <- function(srobj,maxtiers=10,categories,diversities) {
+prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes) {
     meta <- srobj@meta.data
 
     meta <- spread_tierN(meta,max_tiers=maxtiers)
@@ -159,12 +159,12 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categories,diversities) {
     #if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
 
     jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
-          dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
+          dplyr::select(CellID,sample,tierNident,n,all_of(categorical_attributes),all_of(paste0(diversity_attributes,'_diversity')))
 
-    categorydf <- jointb %>% summarize(across(categories, ~ list(paste(unique(.x),collapse=', '))))
-    divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
+    categorydf <- jointb %>% summarize(across(categorical_attributes, ~ list(paste(unique(.x),collapse=', '))))
+    divdf <- jointb %>% summarize_at(paste0(diversity_attributes,'_diversity'),unique)
 
-    jointb <- jointb %>% select(-all_of(categories)) %>% 
+    jointb <- jointb %>% select(-all_of(categorical_attributes)) %>% 
                 summarize(ids = list(CellID),n=unique(n))
 
     finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf)
@@ -295,7 +295,7 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
   srobj <- tierN_SI(srobj, diversity_attributes = diversities)
   
-  treemeta <- prepARBOLmeta_tree(srobj, categories = categories, diversities = diversities)
+  treemeta <- prepARBOLmeta_tree(srobj, categorical_attributes = categories, diversity_attributes = diversities)
 
   ARBOLtree <- as.Node(treemeta) 
 
