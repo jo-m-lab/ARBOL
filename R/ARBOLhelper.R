@@ -150,7 +150,7 @@ SIperIDs <- function(df, group) {
 #' @examples
 #' prepARBOLmeta_tree(srobj, maxtiers=10)
 #' @export
-prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
+prepARBOLmeta_tree <- function(srobj,maxtiers=10,categories,diversities) {
     meta <- srobj@meta.data
 
     meta <- spread_tierN(meta,max_tiers=maxtiers)
@@ -158,14 +158,21 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10) {
     #make sure sample metadata column exists
     if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
 
-    meta <- meta %>% left_join(SIperGroup(srobj@meta.data, species=tierNident, group='sample')) %>% suppressMessages
+    for(z in diversities) {
+        meta <- meta %>% left_join(SIperGroup(meta, species=tierNident, group=z)) %>% suppressMessages
+    }
 
-    jointb <- meta %>% 
-        group_by(tierNident) %>%
-        mutate(n = n()) %>% 
-        dplyr::select(CellID,sample,tierNident,sample_diversity,n) %>% 
-        summarize(ids = list(CellID),samples = list(unique(sample)),
-                    diversity=unique(sample_diversity),n=unique(n))
+    jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
+          dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
+
+    categorydf <- jointb %>% summarize(across(categories, ~ list(paste(unique(.x),collapse=', '))))
+    divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
+
+    jointb <- jointb %>% select(-all_of(categories)) %>% 
+                summarize(ids = list(CellID),n=unique(n))
+
+    finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf)
+    
 
     treemeta <- meta %>% left_join(jointb)
       
@@ -278,9 +285,17 @@ sr_binarytree <- function(srobj,assay='SCT') {
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, diversities = 'sample') {
+sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample') {
 
-  treemeta <- prepARBOLmeta_tree(srobj)
+  if (!is.element('sample',diversities)) {
+    diversities = c('sample',diversities)
+  }
+
+  if (!is.element('sample',categories)) {
+    categories = c('sample',categories)
+  }
+  
+  treemeta <- prepARBOLmeta_tree(srobj, categories = categories, diversities = diversities)
 
   ARBOLtree <- as.Node(treemeta) 
 
@@ -322,7 +337,15 @@ sr_ARBOLclustertree <- function(srobj, diversities = 'sample') {
 #' @examples
 #' srobj <- sr_ARBOLbinarytree(srobj, categories = c('tier1','type','disease'))
 #' @export
-sr_ARBOLbinarytree <- function(srobj, categories = 'tier1', diversities = 'sample') {
+sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'sample') {
+
+  if (!is.element('sample',diversities)) {
+    diversities = c('sample',diversities)
+  }
+
+  if (!is.element('sample',categories)) {
+    categories = c('sample',categories)
+  }
   
   srobj <- sr_binarytree(srobj)
 
@@ -330,37 +353,41 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'tier1', diversities = 'sampl
 
   srobj <- tierN_SI(srobj, diversity_attributes = diversities)
 
-  jointb <- srobj@meta.data %>% 
-      group_by(tierNident) %>%
-      mutate(n = n()) %>% 
-      dplyr::select(CellID,sample,tier1,tierNident,sample_diversity,n) %>% summarize(ids = list(CellID),
-          samples = list(unique(sample)),sample_diversity=unique(sample_diversity), 
-          n=unique(n),tier1=unique(tier1))
+  jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
+            dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
 
-  finaltreedf <- binarydf %>% left_join(jointb)
+  categorydf <- jointb %>% summarize(across(categories, ~ list(paste(unique(.x),collapse=', '))))
+  divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
+
+  jointb <- jointb %>% select(-all_of(categories)) %>% 
+              summarize(ids = list(CellID),n=unique(n))
+
+  finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf)
 
   divtree <- as.Node(finaltreedf)
 
   divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities)
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'tier1','n','pathString',paste0(diversities,'_diversity')))
+  ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'n','pathString', categories, paste0(diversities,'_diversity')))
 
   txt <- ToNewickPS(divtree)
 
   ARBOLphylo <- ape::read.tree(text=txt)
 
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=pathString,tier1,sample_diversity,n)) 
-  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i,tier1))
-  x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=pathString,sample_diversity,n)) 
+  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i))
+#  x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
   x <- x %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.','')) 
 
-  bt0 <- ggraph(x, layout = 'dendrogram') +
-  geom_edge_elbow() + 
-  geom_node_point(aes(label=string),size=0) + 
-#  geom_node_text(aes(filter = leaf, label = name, angle=90),nudge_y=-2,vjust=0.5,hjust=1.01) + 
-  geom_node_text(aes(filter = leaf, label = n, angle=90),color='grey30',nudge_y=-0.7,vjust=0.5,hjust=1.01,size=3) + 
-  theme_classic()
+  bt0 <- ggraph(test2@misc$binarytreeggraph, layout = 'dendrogram') +
+    geom_edge_elbow() + 
+    geom_node_point(size=0) + 
+    geom_node_text(aes(filter = leaf, label = name, fill = tier1), nudge_y=-0.75,vjust=0.5,hjust=1.01) + 
+    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3) +
+    theme_void() +
+    geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + scale_color_gradient(low='grey90',high='grey10') +
+    expand_limits(y=-5)
 
   srobj@misc$binarytree <- divtree
   srobj@misc$binarytreeviz <- bt0
