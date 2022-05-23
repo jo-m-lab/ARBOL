@@ -380,7 +380,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i))
 
-  x <- x %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
+  x <- x %>% activate(nodes) %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
 
   bt0 <- ggraph(test2@misc$binarytreeggraph, layout = 'dendrogram') +
     geom_edge_elbow() + 
