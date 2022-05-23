@@ -298,7 +298,7 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
   Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities)
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'tier1','n','pathString',paste0(diversities,'_diversity')))
+  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'n','pathString', categories, paste0(diversities,'_diversity')))
 
   #simple code call of translation to df disallowing custom diversity_attributes
   #ARBOLdf <- preppedTree_toDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
