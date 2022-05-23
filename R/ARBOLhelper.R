@@ -315,8 +315,11 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
   ARBOLphylo$edge.length <- rep(1,ARBOLphylo$edge.length %>% length)
 
   #convert to tbl_graph object to allow easy plotting with ggraph
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=levelName,tier1,sample_diversity,n))
-  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i,tier1))
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
+      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(diversities,'_diversity'))))
+
+  x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% select(to=i))
+
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
 
   bt0 <- ggraph(x, layout = 'tree', circular=T) + 
@@ -377,9 +380,13 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   ARBOLphylo <- ape::read.tree(text=txt)
 
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(ARBOLdf %>% select(name=pathString,sample_diversity,n)) 
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
+      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(diversities,'_diversity'))))
+
+  x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
+
   x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i))
-#  x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
+
   x <- x %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.','')) 
 
   bt0 <- ggraph(test2@misc$binarytreeggraph, layout = 'dendrogram') +
