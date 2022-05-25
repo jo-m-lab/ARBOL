@@ -209,11 +209,11 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
             ARBOLtree$Do(function(node) {
               ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
                                 node[[y]] <- unique(meta[[y]])
-            }
+            })
             ARBOLtree$Do(function(node) {
               ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
-                                node[[sprintf('%s_majority',y)]] <- names(which.max(table(meta[[y]]))))
-            }
+                                node[[sprintf('%s_majority',y)]] <- names(which.max(table(meta[[y]])))
+            })
             
         }
     }
