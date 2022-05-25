@@ -206,9 +206,15 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
     #propagate additional categorical variables
     if(!is.na(categorical_attributes)) { 
         for (y in categorical_attributes) {
-            ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = c), traversal = "post-order")
-            ARBOLtree$Do(function(node) node[[y]] <- unique(node[[y]]))
-            ARBOLtree$Do(function(node) node[[sprintf('%s_majority',y)]] <- names(which.max(table(unlist(node[[y]])))))
+            ARBOLtree$Do(function(node) {
+              ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
+                                node[[y]] <- unique(meta[[y]])
+            }
+            ARBOLtree$Do(function(node) {
+              ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
+                                node[[sprintf('%s_majority',y)]] <- names(which.max(table(meta[[y]]))))
+            }
+            
         }
     }
                          
@@ -385,8 +391,8 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   bt1 <- ggraph(x, layout = 'dendrogram') +
     geom_edge_elbow() + 
     geom_node_point(size=0) + 
-    geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01) + 
-    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3) +
+    geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01,angle=90) + 
+    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3,angle=90) +
     theme_void() +
     geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + scale_color_gradient(low='grey90',high='grey10') +
     expand_limits(y=-5)
