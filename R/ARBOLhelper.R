@@ -155,9 +155,6 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 
     meta <- spread_tierN(meta,max_tiers=maxtiers)
 
-    #make sure sample metadata column exists
-    #if('sample' %in% colnames(meta)) {message('found sample column')} else {return(message('no sample column'))}
-
     jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
           dplyr::select(CellID,sample,tierNident,n,all_of(categorical_attributes),all_of(paste0(diversity_attributes,'_diversity')))
 
@@ -404,6 +401,26 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   srobj@misc$binarytreeggraph <- x
 
   return(srobj)
+}
+
+#' data.tree to ggraph conversion, by converting data.tree structure (doesn't carry annotations) to ggraph, 
+#' then join data frame of data.tree
+#' requires 'n' and 'pathString' annotations in data.tree
+#' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
+#' 1) write data.tree object to Newick using custom Newick function,
+#' 2) read Newick into ape tree object
+#' 3) ggraph::as_tbl_graph to convert from ape to ggraph
+#' 4) data.tree to node-level dataframe 
+#' 5) join node-level dataframe to tbl_graph nodes
+#' 6) join node-level dataframe to tbl_graph edges
+data.tree_to_ggraph <- function(data.tree, categories, diversities) {
+  txt <- ToNewickPS(data.tree)
+  apeTree <- ape::read.tree(text=txt)
+  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString', categories, paste0(diversities,'_diversity')))
+  treeDF <- treeDF %>% select(name=pathString,n,i,all_of(categories),all_of(paste0(diversities,'_diversity')))
+  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(treeDF)
+  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i))
+  return(x)
 }
 
 #' Merges tierNidents with their nearest neighbors in a binary tree if their sample diversity and number of cells do not meet thresholds

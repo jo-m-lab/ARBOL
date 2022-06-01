@@ -101,7 +101,8 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     message(cbind("found end-node below min number of cells or above max tier. num cells: ", ncol(working_srobj),' < ', min_cluster_size))
     #write end-node table and srobj
     EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
-    #stop recursion
+    #add tierNident to metadata and stop recursion
+    working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.'))
     return(working_srobj)
   }
   
@@ -152,6 +153,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
     
     message("found end-node with one cluster")
+    working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.'))
     return(working_srobj)
   }
 
@@ -170,7 +172,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 
         #write end-node table and srobj
         EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
-
+        working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.'))
         return(working_srobj)
       }
     }
@@ -483,6 +485,7 @@ SplitSrobjOnMeta <- function(srobj, meta, proj_nm_suffix) {
 }
 
 EndNode_Write <- function(working_srobj, srobj_dir = NULL, endclust_dir = NULL, filename = NULL) {
+
   if (!is.null(srobj_dir)) {
     message(paste("saving srobj to", srobj_dir))
     saveRDS(working_srobj, sprintf("%s/subset_srobj.rds", srobj_dir))
@@ -865,4 +868,71 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
   input.srobj@misc <- list("resolution.choice" = resolution.choice)
   return(input.srobj)
 }
+
+
+#' Wraps GenTieredClusters in a larger script to output a cell-level dataframe of cluster identity through the tree.
+#'
+#' @description Runs GenTieredClusters and pulls tierNident per cell from nested seurat object output,
+#' so that endclustdir doesn't have to be used to save tierNident lists
+#'
+#' @examples 
+#' endclustDF <- ARBOL(srobj,
+#'                            saveSROBJdir = "~/tieredoutput/srobjs",
+#'                            figdir = "~/tieredoutput/figdir",
+#'                            SaveEndNamesDir = "~/tieredoutput/endclusts")
+#' 
+#' @param srobj v4 seurat object
+#' @param cluster_assay assay to use for clustering defaults to "SCT"
+#' @param cells cellnames if tiered clustering should start on subset of object
+#' @param tier starting level defaults to 0
+#' @param clustN cluster starting from default to 0
+#' @param PreProcess_fun function to use for preproccessing defaults to PreProcess_sctransform. PreProcess_sctransform_harmony now available.
+#' @param min_cluster_size minimum number of cells to allow further clustering. defaults to 100
+#' @param max_tiers maximum number of tiers to allow further clustering. defaults to 10
+#' @param EnoughDiffUp minimum number of up-regulated genes to call clusters unique. Differential expression is performed when clustering finds 2 clusters. defaults to 5
+#' @param EnoughDiffDown minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped. defaults to 5
+#' @param tierAllowedRecomb minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low.
+#' @param ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution 
+#' @param saveSROBJdir where to save seurat objects for each tier and cluster, if null does not save
+#' @param figdir where to save QC figures for each tier and cluster, if null does not save
+#' @param saveEndNamesDir where to save directory of end clusters, if null does not save
+#' @param SaveEndFileName prefix for all end cluster files
+#' @param harmony_var variable over which to iterate harmony integration
+#' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
+#' @export
+
+ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
+                              PreProcess_fun = PreProcess_sctransform,
+                              ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
+                              saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
+                              min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
+                              tierAllowedRecomb=0,harmony_var=NULL, DownsampleNum = 7500) {
+
+  tiers <- GenTieredClusters(srobj, ...)
+
+  tiers <- unnest(tiers, everything())
+
+  tierNidents <- lapply(tiers, function(srobj) {
+    tryCatch({
+      idents <- srobj@meta.data %>% rownames_to_column('CellID') %>% dplyr::select(CellID,tierNident)
+      return(idents)
+    })
+  })
+
+  endclustDF <- bind_rows(tierNidents)
+
+  return(endclustDF)
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
