@@ -102,7 +102,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     #write end-node table and srobj
     EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
     #add tierNident to metadata and stop recursion
-    working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.'))
+    working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.')
     return(working_srobj)
   }
   
@@ -153,7 +153,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
     
     message("found end-node with one cluster")
-    working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.'))
+    working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.')
     return(working_srobj)
   }
 
@@ -172,7 +172,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 
         #write end-node table and srobj
         EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
-        working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.'))
+        working_srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.')
         return(working_srobj)
       }
     }
@@ -901,14 +901,9 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
 
-ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
-                              PreProcess_fun = PreProcess_sctransform,
-                              ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
-                              saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
-                              min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
-                              tierAllowedRecomb=0,harmony_var=NULL, DownsampleNum = 7500) {
+ARBOL <- function(...) {
 
-  tiers <- GenTieredClusters(srobj, ...)
+  tiers <- GenTieredClusters(...)
 
   tiers <- unnest(tiers, everything())
 
