@@ -350,7 +350,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   
   srobj <- sr_binarytree(srobj)
 
-  binarydf <- bintree.to.df(pvclust_tree=srobj@misc$pvclust)
+  binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
   srobj <- tierN_SI(srobj, diversity_attributes = diversities)
 
@@ -448,9 +448,9 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 #' @param pvclust_tree a pvclust or hclust tree 
 #' @return a dataframe with one row per node of the tree
 #' @examples
-#' binarydf <- bintree.to.df(pvclust_tree=srobj@@misc$pvclust)
+#' binarydf <- bintree_to_df(pvclust_tree=srobj@@misc$pvclust)
 #' @export
-bintree.to.df <- function(pvclust_tree) {
+bintree_to_df <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
   binarydf <- data.frame(ToDataFrameTable(bintree, 'pathString'))
   colnames(binarydf) <- c('pathString')
