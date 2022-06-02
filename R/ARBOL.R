@@ -875,7 +875,7 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 #' @description Performs ARBOL tiered hierarchical clustering on a seurat object. Outputs a dataframe of tier membership per cell
 #'
 #' @examples 
-#' endclustDF <- ARBOL(srobj,
+#' endclustDF <- ARBOL(srobj = srobj,
 #'                            saveSROBJdir = "~/tieredoutput/srobjs",
 #'                            figdir = "~/tieredoutput/figdir",
 #'                            SaveEndNamesDir = "~/tieredoutput/endclusts")
@@ -918,6 +918,8 @@ ARBOL <- function(maxtiers = 10, ...) {
   endclustDF$tierNident <- gsub('_','.',endclustDF$tierNident)
 
   endclustDF <- endclustDF %>% separate(tierNident,into=paste0('tier',1:maxtiers),sep='\\.',remove=FALSE)
+
+  if (!is.null(SaveEndNamesDir)) write.csv(endclustDF,sprintf('%s/endclusts.csv',gsub("\\/[^\\/]+$","",SaveEndNamesDir)))
 
   return(endclustDF)
 }

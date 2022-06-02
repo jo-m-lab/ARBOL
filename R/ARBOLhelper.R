@@ -370,18 +370,9 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities)
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(divtree,'n','pathString', categories, paste0(diversities,'_diversity')))
-
-  txt <- ToNewickPS(divtree)
-
-  ARBOLphylo <- ape::read.tree(text=txt)
-
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
-      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(diversities,'_diversity'))))
+  x <- data.tree_to_ggraph(divtree, categories, diversities)
 
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
-
-  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i))
 
   x <- x %>% activate(nodes) %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
 
@@ -418,8 +409,8 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities) {
   apeTree <- ape::read.tree(text=txt)
   treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString', categories, paste0(diversities,'_diversity')))
   treeDF <- treeDF %>% select(name=pathString,n,i,all_of(categories),all_of(paste0(diversities,'_diversity')))
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% left_join(treeDF)
-  x <- x %>% activate(edges) %>% left_join(ARBOLdf %>% select(to=i))
+  x <- as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
+  x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i))
   return(x)
 }
 
