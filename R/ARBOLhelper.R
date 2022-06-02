@@ -299,9 +299,9 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
   ARBOLtree <- as.Node(treemeta) 
 
-  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities)
+  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories)
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'n','pathString', categories, paste0(diversities,'_diversity')))
+  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'n','pathString', categories, paste0(categories,'_majority'), paste0(diversities,'_diversity')))
 
   #simple code call of translation to df disallowing custom diversity_attributes
   #ARBOLdf <- preppedTree_toDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
@@ -312,7 +312,7 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
   #convert to tbl_graph object to allow easy plotting with ggraph
   x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
-      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(diversities,'_diversity'))))
+      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity'))))
 
   x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% select(to=i))
 
@@ -407,8 +407,8 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 data.tree_to_ggraph <- function(data.tree, categories, diversities) {
   txt <- ToNewickPS(data.tree)
   apeTree <- ape::read.tree(text=txt)
-  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString', categories, paste0(diversities,'_diversity')))
-  treeDF <- treeDF %>% select(name=pathString,n,i,all_of(categories),all_of(paste0(diversities,'_diversity')))
+  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity')))
+  treeDF <- treeDF %>% select(name=pathString,n,i,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')))
   x <- as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i))
   return(x)
