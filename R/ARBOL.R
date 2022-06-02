@@ -872,8 +872,7 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 
 #' Wraps GenTieredClusters in a larger script to output a cell-level dataframe of cluster identity through the tree.
 #'
-#' @description Runs GenTieredClusters and pulls tierNident per cell from nested seurat object output,
-#' so that endclustdir doesn't have to be used to save tierNident lists
+#' @description Performs ARBOL tiered hierarchical clustering on a seurat object. Outputs a dataframe of tier membership per cell
 #'
 #' @examples 
 #' endclustDF <- ARBOL(srobj,
@@ -901,11 +900,11 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
 
-ARBOL <- function(...) {
+ARBOL <- function(maxtiers = 10, ...) {
 
   tiers <- GenTieredClusters(...)
 
-  tiers <- unnest(tiers, everything())
+  tiers <- unlist(tiers)
 
   tierNidents <- lapply(tiers, function(srobj) {
     tryCatch({
@@ -915,6 +914,10 @@ ARBOL <- function(...) {
   })
 
   endclustDF <- bind_rows(tierNidents)
+  endclustDF$tierNident <- sub('_T0C0_', '',endclustDF$tierNident)
+  endclustDF$tierNident <- gsub('_','.',endclustDF$tierNident)
+
+  endclustDF <- endclustDF %>% separate(tierNident,into=paste0('tier',1:maxtiers),sep='\\.',remove=FALSE)
 
   return(endclustDF)
 }
