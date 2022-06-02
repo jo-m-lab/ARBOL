@@ -382,7 +382,8 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
     geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01,angle=90) + 
     geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3,angle=90) +
     theme_void() +
-    geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + scale_color_gradient(low='grey90',high='grey10') +
+    geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + 
+    scale_color_gradient(low='grey90',high='grey10',limits=c(0,1)) +
     expand_limits(y=-5)
 
   srobj@misc$binarytreeviz <- bt1
@@ -427,16 +428,17 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
 
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
-  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1))
+  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0)))
 
-  divtestdf <- data.frame(ToDataFrameTable(srobj@misc$binarytree, "pathString", 'ids', 'tierNident','sample_diversity'))
+  divtestdf <- preppedTree_toDF(bin2, 'height', "pathString", 'ids', 'tierNident','sample_diversity')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
-  divdf2 <- divdf2 %>% distinct
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
 
   divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
   divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent))
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
+                     rename(tierNident=mergedIdent,rawIdent=tierNident)
 
   return(srobj)
 }
