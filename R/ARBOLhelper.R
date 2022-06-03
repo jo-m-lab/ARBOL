@@ -91,7 +91,6 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
 SIperGroup <- function(df, species, group) {
   #enquo parameters to allow dplyr calls
     divcols <- enquo(species)
-    groupcols <- enquo(group)
     #count groups per species
     tierNcount <- df %>% group_by_at(vars(!!divcols)) %>% count(.data[[group]])
     #obtain total N per group
@@ -124,8 +123,6 @@ SIperGroup <- function(df, species, group) {
 #' metadata$condition_diversity <- SIperIDs(metadata, group=condition)
 #' @export
 SIperIDs <- function(df, group) {
-  #enquo parameters to allow dplyr calls
-    groupcols <- enquo(group)
     #count groups
     tierNcount <- df %>% count(.data[[group]])
     #obtain total N per group
@@ -530,67 +527,107 @@ spread_tierN <- function(df, max_tiers = 10) {
 }
 
 #' Calculate curated names for set of clusters as function of their major type
-#' @param srobj a seurat object with metadata columns 'celltype' and 'tierNident' i.e. srobj@@meta.data$celltype
+#' @param srobj a seurat object with a celltype metadata column, specified in celltype_col, and tierNident i.e. srobj@@meta.data$tierNident
 #' @param figdir the figdir from an GenTieredClusters (ARBOL) run 
 #' @param max_cells_per_ident maximum cells to use in FindAllMarkers call. defaults to 200
+#' @param celltype_col the metadata column corresponding to celltype to assign standard names
 #' @return the seurat object with curatedname column in metadata
 #' @examples
 #' srobj <- GetStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
+GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col = 'celltype') {
 
-GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200) {
+  Idents(srobj) <- srobj@meta.data[[celltype_col]]
+  typeobjs <- SplitSrobjOnMeta(srobj, meta=celltype_col,'typeobjects')
 
-  Idents(srobj) <- srobj@meta.data$celltype
-  typeobjs <- SplitSrobjOnMeta(srobj, meta="celltype",'typeobjects')
-
-  if(!file.exists(sprintf('%s/curatedtypeAmongtype1markers.rds',figdir))) {
-    CuratedtypeAmongType1markers <- lapply(typeobjs,function(obj) {
-          if (obj@meta.data$tierNident %>% unique %>% length > 1){
-              Idents(obj) <- obj@meta.data$tierNident;
-              tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
-               return(tmp)
-              }
-          else {
-              return(data.frame())
-          }})
-    saveRDS(CuratedtypeAmongType1markers,sprintf('%s/curatedtypeAmongtype1markers.rds',figdir))
+  if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
+    CuratedtypeAmongType1markers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
+          tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+           return(tmp)})
+    write.table(rbindlist(CuratedtypeAmongType1markers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
   }
-  else(
-    CuratedtypeAmongType1markers <- readRDS(sprintf('%s/curatedtypeAmongtype1markers.rds',figdir))
-  )
+  else {
+    CuratedtypeAmongType1markers <- fread(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) %>%
+                    split(f=.$cluster)
+  }
+  
+  t <- lapply(CuratedtypeAmongType1markers,function(listmarkers) {
+    tryCatch({
+           fccol <- grep("FC",colnames(listmarkers))
+            biomarkers <- listmarkers %>%
+          mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(listmarkers[,!!fccol], as.numeric) * (pct.1 / (pct.2 + 1e-300))) %>%
+                    group_by(cluster) %>% top_n(2, wt=rnkscr) %>% 
+                    arrange(cluster, desc(rnkscr));
 
-  t <- lapply(CuratedtypeAmongType1markers,function(listmarkers,objs) {
-        tryCatch({
-                biomarkers <- listmarkers %>%
-              mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(avg_logFC, as.numeric) * 
-                      (pct.1 / (pct.2 + 1e-300))) %>%
-                        group_by(cluster) %>% top_n(2, wt=rnkscr) %>% 
-                        arrange(cluster, desc(rnkscr));
-
-                lapply(seq_along(biomarkers$gene), function(x) 
-                  paste(biomarkers$gene[x], biomarkers$gene[x+1],sep='.')) %>% unlist -> top2biomarkers
-                  top2biomarkers <- top2biomarkers[seq(1,length(top2biomarkers),2)]
-                  biomarkers$markers <- rep(top2biomarkers,each=2)
-                  endname <- biomarkers %>% select(cluster,markers) %>% summarise_each(funs(max))
-                  return(endname)
-                     },
-               error = function(e) {
-
+            lapply(seq_along(biomarkers$gene), function(x) 
+              paste(biomarkers$gene[x], biomarkers$gene[x+1],sep='.')) %>% unlist -> top2biomarkers
+              top2biomarkers <- top2biomarkers[seq(1,length(top2biomarkers),2)]
+              biomarkers$markers <- rep(top2biomarkers,each=2)
+              endname <- biomarkers %>% select(cluster,markers) %>% summarise_each(funs(max))
+              return(endname)
+                 },
+           error = function(e) {
+                       #print(unique(listmarkers$cluster));
+                       #endname = data.frame(cluster=unique(listmarkers$cluster))
+                       #endname$markers <- NA
+                               #return(endname)
+                                     })
                })
-             })
 
-  suppressWarnings(bind_rows(t,.id='type_id') -> markersAsList)
+  suppressWarnings( bind_rows(t,.id='subtype_id') -> markersAsList)
   message('number of end clusters for which at least two biomarkers were found: ',
        length(markersAsList$cluster))
   message('total number of end clusters: ',length(unique(srobj@meta.data$tierNident)))
   markersAsList <- markersAsList %>% rename(tierNident=cluster)
   srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident") %>% 
-  mutate(curatedname = paste(celltype,markers,sep='.'))
+  mutate(curatedname = paste(.data[[celltype_col]],markers,sep='.'))
   return(srobj)
 }
 
+#' remake ggraph object with new categories and diversities, useful to add curatednames
+#' @param srobj a seurat object with tierNident, sample, and category columns in metadata i.e. srobj@@meta.data$tierNident
+#' @param categories
+#' @param diversities
+#' @return the seurat object with ggraph object remade in srobj@@misc$binarytreeggraph
+#' @examples
+#' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), diversities = c('curatedname','celltype'))
+#' @export
+remake_ggraph <- function(srobj, categories, diversities) {
 
+  if (!is.element('sample',diversities)) {
+    diversities = c('sample',diversities)
+  }
 
+  if (!is.element('sample',categories)) {
+    categories = c('sample',categories)
+  } 
+
+  binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
+
+  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
+
+  jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
+            dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
+
+  categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),','))))
+
+  divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
+
+  jointb <- jointb %>% select(-all_of(categories)) %>% 
+              summarize(ids = list(CellID),n=unique(n))
+
+  finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf)
+
+  divtree <- as.Node(finaltreedf)
+
+  divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
+    diversity_attributes = diversities)
+
+  srobj@misc$binarytreeggraph <- data.tree_to_ggraph(divtree, categories, diversities)
+
+  return(srobj)
+
+}
 
 
 
