@@ -319,8 +319,6 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
 
   bt0 <- ggraph(x, layout = 'tree', circular=T) + 
-  #color branches and nodes by type or tier1 (must propagate this metadata in prepTree)
-    #geom_edge_elbow(aes(colour=factor(tier1))) + geom_node_point(aes(colour = tier1))
   geom_edge_diagonal() + geom_node_point(size=0.3)
 
   srobj@misc$ARBOLclustertree <- Atree
@@ -428,7 +426,7 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
 
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
-  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0)))
+  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
   divtestdf <- preppedTree_toDF(bin2, 'height', "pathString", 'ids', 'tierNident','sample_diversity')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
