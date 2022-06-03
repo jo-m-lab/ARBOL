@@ -356,6 +356,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
             dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
 
   categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),','))))
+
   divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
 
   jointb <- jointb %>% select(-all_of(categories)) %>% 
@@ -491,7 +492,10 @@ preppedTree_toDF <- function(tree, ...) {
 #' srobj <- tierN_SI(srobj, diversity_attributes = c('sample','disease'))
 #' @export
 tierN_SI <- function(srobj, diversity_attributes) {
+  #remove existing diversity metrics
+  srobj@meta.data <- srobj@meta.data %>% dplyr::select(-any_of(paste0(diversity_attributes, '_diversity')))
     for(z in diversity_attributes) {
+        #calculate and join new diversity
         srobj@meta.data <- srobj@meta.data %>% left_join(SIperGroup(srobj@meta.data, species=tierNident, group=z)) %>% suppressMessages
     }
     return(srobj)
