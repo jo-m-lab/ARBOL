@@ -428,7 +428,7 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
   Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(bin2, 'height', "pathString", 'ids', 'tierNident','sample_diversity')
+  divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
   divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
 
