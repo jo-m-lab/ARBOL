@@ -221,18 +221,12 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 }
 
 
-#' Propagate attributes up a data.tree object to enable manipulation and visualization of all nodes
-#' Automatically run when building trees using sr_ARBOLclustertree or sr_ARBOLbinarytree
+#' Prepare ARBOL seurat object metadata for tree building
 #' @param srobj a seurat object with ARBOL 'tierNident' and 'sample' columns
-#' @param ARBOLtree data.tree object
-#' @param numerical_attributes currently not implemented 
-#' @param categorical_attributes categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
-#' majority added as node$attribute_majority
-#' @param diversity_attributes attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
-#' added as node$attribute_diversity
-#' @return data.tree object with attributes propagated to all nodes
+#' @param maxtiers max_tiers parameter used in ARBOL
+#' @return a metadata dataframe ready for tree building
 #' @examples
-#' arbolTree <- prepTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities)
+#' prepARBOLmeta_tree(srobj, maxtiers=10)
 #' @export
 prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample') {
 
@@ -292,19 +286,10 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
 #' @param srobj a seurat object with ARBOL 'tierNident' column
-#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
-#' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
-#' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
-#' or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()
-#' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
-#' currently, sum, count, mean, and median are supported
-#' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param assay the seurat object assay in which to calculate gene medians. Defaults to 'SCT'
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
-#' srobj <- sr_binarytree(srobj = srobj, tree_reduction = 'pca', hclust_method = 'complete',
-#'                          distance_method = 'euclidean', centroid_method = 'median', 
-#'                          centroid_assay = 'SCT', reduction_dims = 1:25)
+#' srobj <- sr_binarytree(srobj)
 #' @export
 sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
@@ -336,13 +321,10 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
 #' @param srobj a seurat object with ARBOL 'tierNident' column
-#' @param centroid_method function to calculate gene centroids per ARBOL end cluster, see Matrix.utils::aggregate.Matrix for options
-#' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param tree_reduction cell x gene reduction space to work from. 'centroids' uses full cell x gene.
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param centroid_method function to calculate gene centroids per ARBOL end cluster, see Matrix::aggregate.Matrix for options
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
-
+#' srobj <- sr_binarytree(srobj)
 #' @export
 get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay) {
@@ -384,20 +366,10 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' Creates binary tree object for ARBOL run, adds it to seurat object along with a graph of it
 #' calls sr_binarytree() in which assay + methods for tree building are called
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
-#' @param categories categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
-#' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
-#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
-#' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
-#' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
-#' or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()
-#' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
-#' currently, sum, count, mean, and median are supported
-#' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
 #' bina
 #' @examples
-#' srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
+#' srobj <- sr_ARBOLbinarytree(srobj, categories = c('tier1','type','disease'))
 #' @export
 sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'sample', 
                                 tree_reduction = 'centroids', hclust_method = 'complete',
@@ -412,7 +384,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
     categories = c('sample',categories)
   }
   
-  srobj <- sr_binarytree(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
+  srobj <- sr_binarytree2(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
                           distance_method = distance_method, centroid_method = centroid_method, 
                           centroid_assay = centroid_assay, reduction_dims = reduction_dims)
 
