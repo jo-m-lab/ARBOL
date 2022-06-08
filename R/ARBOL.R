@@ -900,9 +900,19 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
 
-ARBOL <- function(maxtiers = 10, ...) {
+ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
+                              PreProcess_fun = PreProcess_sctransform,
+                              ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
+                              saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
+                              min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
+                              tierAllowedRecomb=0,harmony_var=NULL, DownsampleNum = 7500) {
 
-  tiers <- GenTieredClusters(...)
+  tiers <- GenTieredClusters(srobj = srobj, cluster_assay = cluster_assay, cells = cells, tier = tier, clustN = clustN,
+                              PreProcess_fun = PreProcess_fun,
+                              ChooseOptimalClustering_fun = ChooseOptimalClustering_fun,
+                              saveSROBJdir = saveSROBJdir, figdir = figdir, SaveEndNamesDir = SaveEndNamesDir, SaveEndFileName = SaveEndFileName,
+                              min_cluster_size = min_cluster_size, max_tiers = max_tiers, EnoughDiffUp = EnoughDiffUp, EnoughDiffDown = EnoughDiffDown,
+                              tierAllowedRecomb = tierAllowedRecomb, harmony_var=harmony_var, DownsampleNum = DownsampleNum)
 
   tiers <- unlist(tiers)
 
