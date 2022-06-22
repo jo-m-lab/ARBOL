@@ -150,13 +150,14 @@ SIperIDs <- function(df, group, diversity_metric = 'simpson') {
 #' @examples
 #' prepARBOLmeta_tree(srobj, maxtiers=10)
 #' @export
-prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes) {
+prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes,numerical_attributes) {
     meta <- srobj@meta.data
 
     meta <- spread_tierN(meta,max_tiers=maxtiers)
 
     jointb <- meta %>% group_by(tierNident) %>% mutate(n=n()) %>% 
-          dplyr::select(CellID,sample,tierNident,n,all_of(categorical_attributes),all_of(paste0(diversity_attributes,'_diversity')))
+          dplyr::select(CellID,sample,tierNident,n,all_of(categorical_attributes),
+                        all_of(paste0(diversity_attributes,'_diversity')), all_of(paste0()))
 
     categorydf <- jointb %>% summarize(across(categorical_attributes, ~ list(paste(unique(.x),collapse=', '))))
     divdf <- jointb %>% summarize_at(paste0(diversity_attributes,'_diversity'),unique)
