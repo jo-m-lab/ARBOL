@@ -77,18 +77,20 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
     return(tiers)
 }
 
-#' Calculate Simpson's index per group in a dataframe (only creates 'diversity column', can't do multiple kinds),
+#' Calculate diversity index per group in a dataframe (adds '%s_diversity' column),
+#' diversity metric options same as those available in vegan diversity() function
 #' @param df a dataframe with species and groups columns
 #' @param species species column to stratify per group
 #' @param group groups column for which to calculate diversity
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return dataframe with species and diversity columns
 #' @examples
-#' dataframe <- dataframe %>% left_join(SIperGroup(dataframe, species=pathString, group='sample')) %>% 
+#' dataframe <- dataframe %>% left_join(DiversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
 #'                            suppressMessages
-#' metadata <- metadata %>% left_join(SIperGroup(metadata, species=tierNident, group='sample')) %>% 
+#' metadata <- metadata %>% left_join(DiversityPerGroup(metadata, species=tierNident, group='sample')) %>% 
 #'                          suppressMessages
 #' @export
-SIperGroup <- function(df, species, group) {
+DiversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') {
   #enquo parameters to allow dplyr calls
     divcols <- enquo(species)
     #count groups per species
@@ -106,15 +108,16 @@ SIperGroup <- function(df, species, group) {
     #NA to 0 necessary for vegan::diversity
     tierNwide[is.na(tierNwide)] <- 0
     #calculate diversity. Can change simpson to other types. Second use of enquo hack just to be able to name it the diversity name, idk if this is necessary
-    simps <- diversity(tierNwide,'simpson') %>% data.frame %>% rownames_to_column(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""))
+    simps <- diversity(tierNwide,diversity_metric) %>% data.frame %>% rownames_to_column(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""))
     #Add 2 column names: your species category (i usually use pathString pulled from the node on the tree), and diversity. This joins to the dataframe by species category.
     colnames(simps) <- c(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""),sprintf('%s_diversity',group))
     return(simps)
 }
 
-#' Calculate Simpson's index for a set of IDs in a dataframe
+#' Calculate diversity index for a set of IDs in a dataframe
 #' @param df a dataframe with group information per cell
 #' @param group groups column for which to calculate diversity
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return a list of diversity per group per cell
 #' @examples
 #' in a data tree
@@ -122,7 +125,7 @@ SIperGroup <- function(df, species, group) {
 #' directly on a dataframe
 #' metadata$condition_diversity <- SIperIDs(metadata, group=condition)
 #' @export
-SIperIDs <- function(df, group) {
+SIperIDs <- function(df, group, diversity_metric = 'simpson') {
     #count groups
     tierNcount <- df %>% count(.data[[group]])
     #obtain total N per group
@@ -136,7 +139,7 @@ SIperIDs <- function(df, group) {
     #NA to 0 necessary for vegan::diversity
     tierNwide[is.na(tierNwide)] <- 0
     #calculate diversity. Can change simpson to other types. Second use of enquo hack just to be able to name it the diversity name, idk if this is necessary
-    return(diversity(tierNwide,'simpson'))
+    return(diversity(tierNwide,diversity_metric))
 }
 
 
@@ -169,13 +172,16 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 #' Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it
 #' calls prepARBOLmeta_tree() and prepTree()
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', and 'sample' columns. 
-#' @param diversity_attributes columns in metadata for which you wish to calculate diversity per node 
+#' @param categories columns in metadata for which you want to track categories present per node. Also finds the majority per node
+#' @param diversities columns in metadata for which you want to calculate diversity per node 
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
+#' @param counts columns in metadata for which you want to count each value per node
 #' @return the input seurat object with tiered clustering tree in srobj@@misc$ARBOLclustertree, 
 #' plot of tree to srobj@@misc$ARBOLclustertreeviz, and ggraph object to srobj@@misc$ARBOLclustertreeggraph
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample') {
+sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = NA) {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -185,13 +191,13 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
     categories = c('sample',categories)
   }
 
-  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
+  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
   
   treemeta <- prepARBOLmeta_tree(srobj, categorical_attributes = categories, diversity_attributes = diversities)
 
   ARBOLtree <- as.Node(treemeta) 
 
-  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories)
+  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts)
 
   ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'n','pathString', categories, paste0(categories,'_majority'), paste0(diversities,'_diversity')))
 
@@ -225,16 +231,19 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 #' Automatically run when building trees using sr_ARBOLclustertree or sr_ARBOLbinarytree
 #' @param srobj a seurat object with ARBOL 'tierNident' and 'sample' columns
 #' @param ARBOLtree data.tree object
-#' @param numerical_attributes currently not implemented 
+#' @param numerical_attributes numerical attributes are propagated up a tree as counts of each unique value per node.
+#' creates a new column per unique value per attribute. counts are added as node$attribute_n_value
 #' @param categorical_attributes categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
 #' majority added as node$attribute_majority
-#' @param diversity_attributes attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
+#' @param diversity_attributes attributes for which to calculate diversity in each node. 
+#' Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' added as node$attribute_diversity
 #' @return data.tree object with attributes propagated to all nodes
 #' @examples
-#' arbolTree <- prepTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities)
+#' arbolTree <- prepTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
 #' @export
-prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample') {
+prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample', diversity_metric = 'simpson') {
 
     #calculate number of children per node
     ARBOLtree$Do(function(node) node$numChildren <- node$children %>% length)
@@ -245,11 +254,18 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
     #propagate node size up tree
     ARBOLtree$Do(function(node) node[['n']] <- Aggregate(node, attribute = 'n', aggFun = sum), traversal = "post-order")
 
-    #propagate additional numerical variables
+    #propagate numerical variables up tree by counting occurrences of each variant z of category y in each node
     if(!is.na(numerical_attributes)) {                     
         for (y in numerical_attributes){
-            ARBOLtree$Do(function(node) node[[y]] <- ifelse(is.na(node[[y]]) & node[['numChildren']]==0,0,node[[y]]))
-            ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+            ARBOLtree$Do(function(node) {
+              ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
+              categories <- srobj@meta.data %>% pull(y); 
+
+              lapply(categories, function(z) {
+                node[[sprintf('%s_n_%s',y,z)]] <- length(which(meta[[y]]==z))
+              })
+
+            })
         }
     }
 
@@ -278,7 +294,7 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
     #calculate diversity attributes per node
     for (y in diversity_attributes) {
         ARBOLtree$Do(function(node) {ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
-                                node[[sprintf('%s_diversity',y)]] <- SIperIDs(meta, group=y)
+                                node[[sprintf('%s_diversity',y)]] <- SIperIDs(meta, group=y, diversity_metric = diversity_metric)
         })
     }
 
@@ -317,7 +333,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
       srobj@misc$pvclust <- result
     }
 
-    if(tree_reduction %in% names(srobj@reductions)) {
+    else if(tree_reduction %in% names(srobj@reductions)) {
 
       centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay)
@@ -386,6 +402,8 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
 #' @param categories categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
 #' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
+#' @param counts attributes for which to count unique values per node.
 #' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
 #' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
@@ -400,6 +418,7 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
 #' @export
 sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'sample', 
+                                diversity_metric = 'simpson', counts = NA,
                                 tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
                                 centroid_assay = 'SCT', reduction_dims = 1:25) {
@@ -418,7 +437,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
-  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
+  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
 
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
             dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
@@ -435,7 +454,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   divtree <- as.Node(finaltreedf)
 
   divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
-    diversity_attributes = diversities)
+    diversity_attributes = diversities, numerical_attributes = counts)
 
   x <- data.tree_to_ggraph(divtree, categories, diversities)
 
@@ -480,7 +499,6 @@ cosine <- function(x) {
 #' 3) ggraph::as_tbl_graph to convert from ape to ggraph
 #' 4) data.tree to node-level dataframe 
 #' 5) join node-level dataframe to tbl_graph nodes
-#' 6) join node-level dataframe to tbl_graph edges
 data.tree_to_ggraph <- function(data.tree, categories, diversities) {
   txt <- ToNewickPS(data.tree)
   apeTree <- ape::read.tree(text=txt)
@@ -561,19 +579,21 @@ preppedTree_toDF <- function(tree, ...) {
     return(ARBOLdf)
 }
 
-#' Calculate Gini-Simpson's Index for tierNidents for multiple attributes of the data
+#' Calculate Diversity Index for tierNidents for multiple attributes of the data
+#' diversity metric options same as those available in vegan's diversity() function
 #' @param srobj a seurat object with ARBOL tierNident column
 #' @param diversity_attributes the attributes you wish to calculate diversity for (e.g. disease, sample)
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return the seurat object with diversity per attribute per tierNident added to the metadata
 #' @examples
-#' srobj <- tierN_SI(srobj, diversity_attributes = c('sample','disease'))
+#' srobj <- tierN_diversity(srobj, diversity_attributes = c('sample','disease'))
 #' @export
-tierN_SI <- function(srobj, diversity_attributes) {
+tierN_diversity <- function(srobj, diversity_attributes, diversity_metric = 'simpson') {
   #remove existing diversity metrics
   srobj@meta.data <- srobj@meta.data %>% dplyr::select(-any_of(paste0(diversity_attributes, '_diversity')))
     for(z in diversity_attributes) {
         #calculate and join new diversity
-        srobj@meta.data <- srobj@meta.data %>% left_join(SIperGroup(srobj@meta.data, species=tierNident, group=z)) %>% suppressMessages
+        srobj@meta.data <- srobj@meta.data %>% left_join(DiversityPerGroup(srobj@meta.data, species=tierNident, group=z, diversity_metric = diversity_metric)) %>% suppressMessages
     }
     return(srobj)
 }
@@ -639,11 +659,9 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
                     group_by(cluster) %>% top_n(2, wt=rnkscr) %>% 
                     arrange(cluster, desc(rnkscr));
 
-            lapply(seq_along(biomarkers$gene), function(x) 
-              paste(biomarkers$gene[x], biomarkers$gene[x+1],sep='.')) %>% unlist -> top2biomarkers
-              top2biomarkers <- top2biomarkers[seq(1,length(top2biomarkers),2)]
-              biomarkers$markers <- rep(top2biomarkers,each=2)
-              endname <- biomarkers %>% select(cluster,markers) %>% summarise_each(funs(max))
+            endname <- biomarkers %>% summarize(markers = paste(gene, collapse="."))
+
+              endname <- endname %>% select(cluster,markers)
               return(endname)
                  },
            error = function(e) {
@@ -655,12 +673,16 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
                })
 
   suppressWarnings( bind_rows(t,.id='subtype_id') -> markersAsList)
+
   message('number of end clusters for which at least two biomarkers were found: ',
        length(markersAsList$cluster))
   message('total number of end clusters: ',length(unique(srobj@meta.data$tierNident)))
+
   markersAsList <- markersAsList %>% rename(tierNident=cluster)
+
   srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident") %>% 
   mutate(curatedname = paste(.data[[celltype_col]],markers,sep='.'))
+
   return(srobj)
 }
 
@@ -668,11 +690,13 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 #' @param srobj a seurat object with tierNident, sample, and category columns in metadata i.e. srobj@@meta.data$tierNident
 #' @param categories
 #' @param diversities
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
+#' @param counts attributes for which to count unique values per node.
 #' @return the seurat object with ggraph object remade in srobj@@misc$binarytreeggraph
 #' @examples
 #' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), diversities = c('curatedname','celltype'))
 #' @export
-remake_ggraph <- function(srobj, categories, diversities) {
+remake_ggraph <- function(srobj, categories, diversities, diversity_metric = 'simpson') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -684,7 +708,7 @@ remake_ggraph <- function(srobj, categories, diversities) {
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
-  srobj <- tierN_SI(srobj, diversity_attributes = diversities)
+  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric, counts = NA)
 
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
             dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
@@ -701,7 +725,7 @@ remake_ggraph <- function(srobj, categories, diversities) {
   divtree <- as.Node(finaltreedf)
 
   divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
-    diversity_attributes = diversities)
+    diversity_attributes = diversities, numerical_attributes = counts)
 
   srobj@misc$binarytreeggraph <- data.tree_to_ggraph(divtree, categories, diversities)
 

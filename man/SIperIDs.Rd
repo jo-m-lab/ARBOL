@@ -2,20 +2,22 @@
 % Please edit documentation in R/ARBOLhelper.R
 \name{SIperIDs}
 \alias{SIperIDs}
-\title{Calculate Simpson's index for a set of IDs in a dataframe}
+\title{Calculate diversity index for a set of IDs in a dataframe}
 \usage{
-SIperIDs(df, group)
+SIperIDs(df, group, diversity_metric = "simpson")
 }
 \arguments{
 \item{df}{a dataframe with group information per cell}
 
 \item{group}{groups column for which to calculate diversity}
+
+\item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 }
 \value{
 a list of diversity per group per cell
 }
 \description{
-Calculate Simpson's index for a set of IDs in a dataframe
+Calculate diversity index for a set of IDs in a dataframe
 }
 \examples{
 in a data tree

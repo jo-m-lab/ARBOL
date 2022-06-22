@@ -5,10 +5,44 @@
 \title{Creates binary tree object for ARBOL run, adds it to seurat object along with a graph of it
 calls sr_binarytree() in which assay + methods for tree building are called}
 \usage{
-sr_ARBOLbinarytree(srobj, diversity_attributes = "sample")
+sr_ARBOLbinarytree(
+  srobj,
+  categories = "sample",
+  diversities = "sample",
+  diversity_metric = "simpson",
+  counts = NA,
+  tree_reduction = "centroids",
+  hclust_method = "complete",
+  distance_method = "euclidean",
+  centroid_method = "mean",
+  centroid_assay = "SCT",
+  reduction_dims = 1:25
+)
 }
 \arguments{
 \item{srobj}{a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns.}
+
+\item{categories}{categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node}
+
+\item{diversities}{attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.}
+
+\item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
+
+\item{counts}{attributes for which to count unique values per node.}
+
+\item{tree_reduction}{either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj}
+
+\item{hclust_method}{any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'}
+
+\item{distance_method}{any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
+or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()}
+
+\item{centroid_method}{the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
+currently, sum, count, mean, and median are supported}
+
+\item{centroid_assay}{if using cell x gene data (not any srobj@reduction), the assay within which to calculate centroids}
+
+\item{reduction_dims}{the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25}
 }
 \value{
 the input seurat object with binary tree pvclust object in srobj@misc$pvclust, 
@@ -19,5 +53,5 @@ Creates binary tree object for ARBOL run, adds it to seurat object along with a 
 calls sr_binarytree() in which assay + methods for tree building are called
 }
 \examples{
-srobj <- sr_ARBOLbinarytree(srobj)
+srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
 }

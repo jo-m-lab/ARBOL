@@ -4,7 +4,12 @@
 \alias{prepARBOLmeta_tree}
 \title{Prepare ARBOL seurat object metadata for tree building}
 \usage{
-prepARBOLmeta_tree(srobj, maxtiers = 10)
+prepARBOLmeta_tree(
+  srobj,
+  maxtiers = 10,
+  categorical_attributes,
+  diversity_attributes
+)
 }
 \arguments{
 \item{srobj}{a seurat object with ARBOL 'tierNident' and 'sample' columns}

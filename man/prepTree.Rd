@@ -2,27 +2,42 @@
 % Please edit documentation in R/ARBOLhelper.R
 \name{prepTree}
 \alias{prepTree}
-\title{Prepare ARBOL seurat object metadata for tree building}
+\title{Propagate attributes up a data.tree object to enable manipulation and visualization of all nodes
+Automatically run when building trees using sr_ARBOLclustertree or sr_ARBOLbinarytree}
 \usage{
 prepTree(
   ARBOLtree,
   srobj,
   numerical_attributes = NA,
   categorical_attributes = NA,
-  diversity_attributes = "sample"
+  diversity_attributes = "sample",
+  diversity_metric = "simpson"
 )
 }
 \arguments{
+\item{ARBOLtree}{data.tree object}
+
 \item{srobj}{a seurat object with ARBOL 'tierNident' and 'sample' columns}
 
-\item{maxtiers}{max_tiers parameter used in ARBOL}
+\item{numerical_attributes}{numerical attributes are propagated up a tree as counts of each unique value per node.
+creates a new column per unique value per attribute. counts are added as node$attribute_n_value}
+
+\item{categorical_attributes}{categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
+majority added as node$attribute_majority}
+
+\item{diversity_attributes}{attributes for which to calculate diversity in each node. 
+Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()}
+
+\item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'
+added as node$attribute_diversity}
 }
 \value{
-a metadata dataframe ready for tree building
+data.tree object with attributes propagated to all nodes
 }
 \description{
-Prepare ARBOL seurat object metadata for tree building
+Propagate attributes up a data.tree object to enable manipulation and visualization of all nodes
+Automatically run when building trees using sr_ARBOLclustertree or sr_ARBOLbinarytree
 }
 \examples{
-prepARBOLmeta_tree(srobj, maxtiers=10)
+arbolTree <- prepTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
 }

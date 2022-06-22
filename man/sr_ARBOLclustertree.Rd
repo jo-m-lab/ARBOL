@@ -5,12 +5,24 @@
 \title{Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it
 calls prepARBOLmeta_tree() and prepTree()}
 \usage{
-sr_ARBOLclustertree(srobj, diversity_attributes = "sample")
+sr_ARBOLclustertree(
+  srobj,
+  categories = "sample",
+  diversities = "sample",
+  diversity_metric = "simpson",
+  counts = NA
+)
 }
 \arguments{
 \item{srobj}{a seurat object with ARBOL 'tierNident', 'CellID', and 'sample' columns.}
 
-\item{diversity_attributes}{columns in metadata for which you wish to calculate diversity per node}
+\item{categories}{columns in metadata for which you want to track categories present per node. Also finds the majority per node}
+
+\item{diversities}{columns in metadata for which you want to calculate diversity per node}
+
+\item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
+
+\item{counts}{columns in metadata for which you want to count each value per node}
 }
 \value{
 the input seurat object with tiered clustering tree in srobj@misc$ARBOLclustertree, 

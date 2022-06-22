@@ -4,14 +4,21 @@
 \alias{GetStandardNames}
 \title{Calculate curated names for set of clusters as function of their major type}
 \usage{
-GetStandardNames(srobj, figdir, max_cells_per_ident = 200)
+GetStandardNames(
+  srobj,
+  figdir,
+  max_cells_per_ident = 200,
+  celltype_col = "celltype"
+)
 }
 \arguments{
-\item{srobj}{a seurat object with metadata columns 'celltype' and 'tierNident' i.e. srobj@meta.data$celltype}
+\item{srobj}{a seurat object with a celltype metadata column, specified in celltype_col, and tierNident i.e. srobj@meta.data$tierNident}
 
 \item{figdir}{the figdir from an GenTieredClusters (ARBOL) run}
 
 \item{max_cells_per_ident}{maximum cells to use in FindAllMarkers call. defaults to 200}
+
+\item{celltype_col}{the metadata column corresponding to celltype to assign standard names}
 }
 \value{
 the seurat object with curatedname column in metadata
