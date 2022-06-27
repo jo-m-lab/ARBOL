@@ -213,6 +213,10 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
     categories = c('sample',categories)
   }
 
+  if (!is.element('sample',counts)) {
+    counts = c('sample',counts)
+  }
+
   srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
   
   treemeta <- prepARBOLmeta_tree(srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = counts)
@@ -451,6 +455,10 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   if (!is.element('sample',categories)) {
     categories = c('sample',categories)
+  }
+
+  if (!is.element('sample',counts)) {
+    counts = c('sample',counts)
   }
   
   srobj <- sr_binarytree(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
@@ -743,6 +751,10 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   if (!is.element('sample',categories)) {
     categories = c('sample',categories)
+  } 
+
+  if (!is.element('sample',counts)) {
+    counts = c('sample',counts)
   } 
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
