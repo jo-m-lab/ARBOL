@@ -564,6 +564,7 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts) {
 #' @export
 MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 
+  srobj@misc$rawBinaryTree <- srobj@misc$binarytree
   #DataTree::Prune chops all nodes that don't meet a threshold
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
@@ -727,8 +728,12 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 
   markersAsList <- markersAsList %>% rename(tierNident=cluster)
 
+  srobj@meta.data$CellID <- row.names(srobj@meta.data)
+
   srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident") %>% 
   mutate(curatedname = paste(.data[[celltype_col]],markers,sep='.'))
+
+  row.names(srobj@meta.data) <- srobj@meta.data$CellID
 
   return(srobj)
 }
