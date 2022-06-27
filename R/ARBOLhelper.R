@@ -283,15 +283,11 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
     #propagate numerical variables up tree by counting occurrences of each variant z of category y in each node
     if(!is.na(numerical_attributes)) {                     
         for (y in numerical_attributes){
-            ARBOLtree$Do(function(node) {
-              ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
-              categories <- srobj@meta.data %>% pull(y); 
-
-              lapply(categories, function(z) {
-                node[[sprintf('%s_n_%s',y,z)]] <- length(which(meta[[y]]==z))
-              })
-
-            })
+            uniqs <- unique(srobj@meta.data[[y]])
+            attrs = sprintf('%s_n_%s',y,uniqs)
+            for (attr in attrs) {
+                ARBOLtree$Do(function(node) node[[attr]] <- Aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
+            }            
         }
     }
 
