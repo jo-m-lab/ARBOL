@@ -203,7 +203,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = NA) {
+sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = NA, diversity_metric = 'simpson') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -747,7 +747,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
-  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric, counts = NA)
+  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
 
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
             dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
