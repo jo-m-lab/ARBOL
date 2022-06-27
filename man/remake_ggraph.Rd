@@ -15,6 +15,10 @@ remake_ggraph(
 \arguments{
 \item{srobj}{a seurat object with tierNident, sample, and category columns in metadata i.e. srobj@meta.data$tierNident}
 
+\item{categories}{categories as in tree building functions}
+
+\item{diversities}{diversities as in tree building functions}
+
 \item{counts}{attributes for which to count unique values per node.}
 
 \item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}

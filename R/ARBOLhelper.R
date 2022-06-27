@@ -203,7 +203,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = NA, diversity_metric = 'simpson') {
+sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = NA) {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
