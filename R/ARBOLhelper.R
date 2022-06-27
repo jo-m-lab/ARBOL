@@ -243,7 +243,7 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
 
   bt0 <- ggraph(x, layout = 'tree', circular=T) + 
-  geom_edge_diagonal() + geom_node_point(size=0.3)
+  geom_edge_diagonal() + geom_node_point(size=0.3) + theme_classic()
 
   srobj@misc$ARBOLclustertree <- Atree
   srobj@misc$ARBOLclustertreeviz <- bt0
@@ -369,7 +369,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
     }
 
     else {
-      message(sprintf('%s isnt an ARBOL implemented reduction for tree building',tree_reduction))
+      message(sprintf('%s isnt an ARBOL implemented reduction for tree building, or does not exist in srobj@reductions',tree_reduction))
     }
 
     return(srobj)
@@ -475,7 +475,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   jointb <- jointb %>% select(-all_of(categories)) %>% 
               summarize(ids = list(CellID),n=unique(n))
 
-  numericaltb <- meta %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
+  numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
 
   for (x in counts) {
     attribute <- enquo(x)
@@ -731,8 +731,8 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 
 #' remake ggraph object with new categories and diversities, useful to add curatednames
 #' @param srobj a seurat object with tierNident, sample, and category columns in metadata i.e. srobj@@meta.data$tierNident
-#' @param categories
-#' @param diversities
+#' @param categories categories as in tree building functions
+#' @param diversities diversities as in tree building functions
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
 #' @return the seurat object with ggraph object remade in srobj@@misc$binarytreeggraph
@@ -763,7 +763,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
   jointb <- jointb %>% select(-all_of(categories)) %>% 
               summarize(ids = list(CellID),n=unique(n))
 
-  numericaltb <- meta %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
+  numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
 
   for (x in counts) {
     attribute <- enquo(x)

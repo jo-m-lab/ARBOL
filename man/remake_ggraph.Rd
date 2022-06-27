@@ -4,14 +4,20 @@
 \alias{remake_ggraph}
 \title{remake ggraph object with new categories and diversities, useful to add curatednames}
 \usage{
-remake_ggraph(srobj, categories, diversities, diversity_metric = "simpson")
+remake_ggraph(
+  srobj,
+  categories,
+  diversities,
+  counts,
+  diversity_metric = "simpson"
+)
 }
 \arguments{
 \item{srobj}{a seurat object with tierNident, sample, and category columns in metadata i.e. srobj@meta.data$tierNident}
 
-\item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
-
 \item{counts}{attributes for which to count unique values per node.}
+
+\item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 }
 \value{
 the seurat object with ggraph object remade in srobj@misc$binarytreeggraph

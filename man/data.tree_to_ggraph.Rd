@@ -12,7 +12,7 @@ Used to convert annotated binary phylogeny tree to ggraph for easier plotting
 4) data.tree to node-level dataframe 
 5) join node-level dataframe to tbl_graph nodes}
 \usage{
-data.tree_to_ggraph(data.tree, categories, diversities)
+data.tree_to_ggraph(data.tree, categories, diversities, counts)
 }
 \description{
 data.tree to ggraph conversion, by converting data.tree structure (doesn't carry annotations) to ggraph, 
