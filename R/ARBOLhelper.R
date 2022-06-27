@@ -203,7 +203,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 #' @examples
 #' srobj <- sr_ARBOLclustertree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = NA) {
+sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = 'sample') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -444,7 +444,7 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
 #' @export
 sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'sample', 
-                                diversity_metric = 'simpson', counts = NA,
+                                diversity_metric = 'simpson', counts = 'sample',
                                 tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
                                 centroid_assay = 'SCT', reduction_dims = 1:25) {
