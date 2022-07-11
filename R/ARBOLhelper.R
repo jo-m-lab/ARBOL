@@ -507,7 +507,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   x <- x %>% activate(nodes) %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
 
-  bt1 <- ggraph(x, layout = 'dendrogram') +
+  bt1 <- ggraph(x, layout = 'dendrogram', height=plotHeight) +
     geom_edge_elbow() + 
     geom_node_point(size=0) + 
     geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01,angle=90) + 
@@ -549,10 +549,10 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts) {
   apeTree <- ape::read.tree(text=txt)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
   treeDF <- treeDF %>% select(name=pathString,n,i,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
-  x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i))
+  x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
 }
 
@@ -564,7 +564,7 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts) {
 #' @export
 MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 
-  srobj@misc$rawBinaryTree <- srobj@misc$binarytree
+  srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
   Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
@@ -588,7 +588,6 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 
 
 #' Converts pvclust tree object to dataframe with row per node
-#' calls prepARBOLmeta_tree() and prepTree()
 #' @param pvclust_tree a pvclust or hclust tree 
 #' @return a dataframe with one row per node of the tree
 #' @examples
@@ -596,9 +595,10 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 #' @export
 bintree_to_df <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
-  binarydf <- data.frame(ToDataFrameTable(bintree, 'pathString'))
-  colnames(binarydf) <- c('pathString')
+  binarydf <- data.frame(ToDataFrameTree(bintree, 'pathString','plotHeight'))
+  colnames(binarydf) <- c('remove','pathString','plotHeight')
   binarydf$tierNident <- sub('.*\\/', '', binarydf$pathString)
+  binarydf <- binarydf %>% dplyr::select(-remove)
   return(binarydf)
 }
 
