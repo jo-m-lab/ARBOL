@@ -355,7 +355,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
       centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = centroid_method, centroid_assay = centroid_assay)
+                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
 
@@ -463,7 +463,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   
   srobj <- sr_binarytree(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
                           distance_method = distance_method, centroid_method = centroid_method, 
-                          centroid_assay = centroid_assay, reduction_dims = reduction_dims)
+                          centroid_assay = centroid_assay, gene_list = gene_list, reduction_dims = reduction_dims)
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
