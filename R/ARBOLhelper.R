@@ -341,6 +341,7 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
 #' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_Centroids
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
@@ -350,19 +351,12 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
 #' @export
 sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
-                               centroid_assay = 'SCT', reduction_dims = 1:25) {
+                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
 
-    if (tree_reduction == 'centroids') {
+    if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
       centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay)
-      result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
-      srobj@misc$pvclust <- result
-    }
 
-    else if(tree_reduction %in% names(srobj@reductions)) {
-
-      centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = centroid_method, centroid_assay = centroid_assay)
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
 
       srobj@misc$pvclust <- result
@@ -380,6 +374,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
 #' @param srobj a seurat object with ARBOL 'tierNident' column
 #' @param centroid_method function to calculate gene centroids per ARBOL end cluster, see Matrix.utils::aggregate.Matrix for options
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation
 #' @param tree_reduction cell x gene reduction space to work from. 'centroids' uses full cell x gene.
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
@@ -387,14 +382,14 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
 
 #' @export
 get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = centroid_method, centroid_assay = centroid_assay) {
+                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {
 
     srobj_meta <- srobj@meta.data
     if (tree_reduction %in% names(srobj@reductions)) {
       scaled.data.mtx <- Embeddings(srobj, reduction=tree_reduction)[,reduction_dims]
     }
     else {
-      scaled.data.mtx <- Matrix(t(as.matrix(srobj[[centroid_assay]]@data)),sparse=TRUE)
+      scaled.data.mtx <- Matrix(t(as.matrix(srobj[[centroid_assay]]@data[gene_list,])),sparse=TRUE)
     }
         #pull seurat object's cell ID + tierNident
     t2 <- srobj_meta[,c('CellID','tierNident')]
@@ -437,9 +432,10 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), list of genes to include in centroid calculation. 
+#' defaults to all genes in centroid_assay if no input is given
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
-#' bina
 #' @examples
 #' srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
 #' @export
@@ -447,7 +443,11 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
                                 diversity_metric = 'simpson', counts = 'sample',
                                 tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
-                                centroid_assay = 'SCT', reduction_dims = 1:25) {
+                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = NA) {
+
+  if(is.na(gene_list)) {
+    gene_list = rownames(srobj[[centroid_assay]]@data)
+  }
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -507,7 +507,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   x <- x %>% activate(nodes) %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
 
-  bt1 <- ggraph(x, layout = 'dendrogram', height=plotHeight) +
+  bt1 <- ggraph(x, layout = 'dendrogram', height=plotHeight*10) +
     geom_edge_elbow() + 
     geom_node_point(size=0) + 
     geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01,angle=90) + 
@@ -679,11 +679,13 @@ spread_tierN <- function(df, max_tiers = 10) {
 #' @param figdir the figdir from an GenTieredClusters (ARBOL) run 
 #' @param max_cells_per_ident maximum cells to use in FindAllMarkers call. defaults to 200
 #' @param celltype_col the metadata column corresponding to celltype to assign standard names
+#' @param standardname_col metadata column to which to output celltype names. defaults to 'curatedname'
+#' @param n_genes number of genes with which to create standard names. defaults to 2
 #' @return the seurat object with curatedname column in metadata
 #' @examples
 #' srobj <- GetStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
-GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col = 'celltype') {
+GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col = 'celltype',standardname_col = 'curatedname',n_genes = 2) {
 
   Idents(srobj) <- srobj@meta.data[[celltype_col]]
   typeobjs <- SplitSrobjOnMeta(srobj, meta=celltype_col,'typeobjects')
@@ -704,7 +706,7 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
            fccol <- grep("FC",colnames(listmarkers))
             biomarkers <- listmarkers %>%
           mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(listmarkers[,!!fccol], as.numeric) * (pct.1 / (pct.2 + 1e-300))) %>%
-                    group_by(cluster) %>% top_n(2, wt=rnkscr) %>% 
+                    group_by(cluster) %>% top_n(n_genes, wt=rnkscr) %>% 
                     arrange(cluster, desc(rnkscr));
 
             endname <- biomarkers %>% summarize(markers = paste(gene, collapse="."))
@@ -730,8 +732,9 @@ GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 
   srobj@meta.data$CellID <- row.names(srobj@meta.data)
 
-  srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident") %>% 
-  mutate(curatedname = paste(.data[[celltype_col]],markers,sep='.'))
+  srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident")
+  srobj@meta.data[[standardname_col]] <- paste(srobj@meta.data[[celltype_col]],srobj@meta.data$markers,sep='.')
+
 
   row.names(srobj@meta.data) <- srobj@meta.data$CellID
 
