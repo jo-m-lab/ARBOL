@@ -435,6 +435,7 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
     }
     else {
       gene_list = match(gene_list,rownames(srobj[[centroid_assay]]@data))
+      gene_list <- gene_list[!is.na(gene_list)]
       submtx <- srobj[[centroid_assay]]@data[gene_list,]
       scaled.data.mtx <- Matrix(t(as.matrix(submtx)),sparse=TRUE)
     }
