@@ -52,6 +52,51 @@ ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
   
 }
 
+#' data.tree to ggraph object conversion with custom Node->dendrogram function that uses pathString as node names. 
+#' @param object A data tree object
+#' @param heightAttribute plot height attribute. Default is plotHeight
+#' @return dendrogram object
+#' @examples
+#' txt <- ToNewickPS(divtree)
+#' ARBOLphylo <- ape::read.tree(text=txt)
+#' @export
+#' Functions for data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. 
+#' This is useful when node names are redundant throughout a tree, which happens in binary tree calculation with pvclust
+
+as.dendrogram.NodePS <- function(object, heightAttribute = 'plotHeight', edgetext = FALSE,
+                               namefield = 'pathString', ...) {
+  node <- object
+
+  height <- as.vector(GetAttribute(node, heightAttribute))
+
+  if (node$isLeaf) {
+    res <- node$value
+    if (is.null(res)) res <- 0
+    res <- structure(res, 
+                     label = node[[namefield]], 
+                     members = 1,
+                     height = height,
+                     leaf = node$isLeaf,
+                     class = "dendrogram")
+    
+  } else {
+
+    res <- unname(lapply(node$children, FUN = function(x) as.dendrogram.NodePS(x, heightAttribute, ...)))
+    res <- structure(res, 
+                     label = node[[namefield]],
+                     members = node$leafCount,
+                     midpoint = node$midpoint,
+                     height = height,
+                     class = "dendrogram")
+    
+    if (edgetext) attr(res, "edgetext") <- node[[namefield]]
+    
+  }
+  
+  return (res)
+  
+}
+
 
 #' Load 'endclusters' folder from R ARBOL output as a dataframe
 #' @param folder R ARBOL endclusts folder
@@ -443,7 +488,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
                                 diversity_metric = 'simpson', counts = 'sample',
                                 tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
-                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = NA) {
+                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
 
   if(is.na(gene_list)) {
     gene_list = rownames(srobj[[centroid_assay]]@data)
@@ -503,9 +548,9 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   x <- data.tree_to_ggraph(divtree, categories, diversities, counts)
 
-  x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
+  x <- x %>% activate(nodes) %>% mutate(tier = str_count(label, "\\."))
 
-  x <- x %>% activate(nodes) %>% mutate(string = name, name = basename(name) %>% str_replace_all('T0C0.',''))
+  x <- x %>% activate(nodes) %>% mutate(string = label, name = basename(label) %>% str_replace_all('T0C0.',''))
 
   bt1 <- ggraph(x, layout = 'dendrogram', height=plotHeight*10) +
     geom_edge_elbow() + 
@@ -526,6 +571,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   return(srobj)
 }
 
+#' custom cosine distance method for pvclust
 cosine <- function(x) {
          x <- as.matrix(x)
          y <- t(x) %*% x
@@ -535,8 +581,9 @@ cosine <- function(x) {
          return(res)
      }
 
-#' data.tree to ggraph conversion, by converting data.tree structure (doesn't carry annotations) to ggraph, 
-#' then join data frame of data.tree
+#' data.tree to ggraph conversion, by converting data.tree structure to ape via newick (doesn't carry annotations)
+#' then ape (still doesn't carry annotations) to ggraph, 
+#' then join data frame of data.tree to restore annotations.
 #' requires 'n' and 'pathString' annotations in data.tree
 #' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
 #' 1) write data.tree object to Newick using custom Newick function,
@@ -544,7 +591,8 @@ cosine <- function(x) {
 #' 3) ggraph::as_tbl_graph to convert from ape to ggraph
 #' 4) data.tree to node-level dataframe 
 #' 5) join node-level dataframe to tbl_graph nodes
-data.tree_to_ggraph <- function(data.tree, categories, diversities, counts) {
+#' The use of ToNewick is a major bottleneck in computation speed right now
+data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   txt <- ToNewickPS(data.tree)
   apeTree <- ape::read.tree(text=txt)
   attrs <- data.tree$attributesAll
@@ -552,6 +600,29 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts) {
   treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
   treeDF <- treeDF %>% select(name=pathString,n,i,plotHeight,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
+  x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
+  return(x)
+}
+
+#' data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
+#' then ape (still doesn't carry annotations) to ggraph, 
+#' then join data frame of data.tree to restore annotations.
+#' requires 'n' and 'pathString' annotations in data.tree
+#' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
+#' 1) write data.tree object to Newick using custom Newick function,
+#' 2) read Newick into ape tree object
+#' 3) ggraph::as_tbl_graph to convert from ape to ggraph
+#' 4) data.tree to node-level dataframe 
+#' 5) join node-level dataframe to tbl_graph nodes
+#' The use of ToNewick is a major bottleneck in computation speed right now
+data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heightAttribute = 'plotHeight') {
+  datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
+  x <- as_tbl_graph(datadend)
+  attrs <- data.tree$attributesAll
+  count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
+  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
+  x <- as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
 }
@@ -585,7 +656,35 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   return(srobj)
 }
 
+#' Merges tierNidents with their nearest neighbors in a binary tree by custom thresholds
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
+#' @examples
+#' srobj <- MergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
+#' @export
+MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
+  srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
+  #DataTree::Prune chops all nodes that don't meet a threshold
+  for (z in seq(1,length(threshold_attributes))) {
+    Prune(srobj@misc$binarytree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
+  } 
+
+  #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
+  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
+
+  divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+
+  divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
+  divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
+
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
+                     rename(tierNident=mergedIdent,rawIdent=tierNident)
+
+  return(srobj)
+}
 
 #' Converts pvclust tree object to dataframe with row per node
 #' @param pvclust_tree a pvclust or hclust tree 
@@ -806,11 +905,6 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
   return(srobj)
 
 }
-
-
-
-
-
 
 
 
