@@ -434,6 +434,7 @@ get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
       scaled.data.mtx <- Embeddings(srobj, reduction=tree_reduction)[,reduction_dims]
     }
     else {
+      gene_list = match(gene_list,rownames(srobj[["RNA"]]@data))
       scaled.data.mtx <- Matrix(t(as.matrix(srobj[[centroid_assay]]@data[gene_list,])),sparse=TRUE)
     }
         #pull seurat object's cell ID + tierNident
