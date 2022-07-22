@@ -32,7 +32,8 @@ Depends:
 	scatterpie,
 	ggnewscale,
 	glmGamPoi,
-	strex
+	strex,
+    cluster
 Remotes:
 	jo-m-lab/ARBOL
 License: GPL
