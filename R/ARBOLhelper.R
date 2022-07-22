@@ -375,6 +375,39 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
     return(ARBOLtree)
 }
 
+#' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
+#' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
+#' @param srobj a seurat object with ARBOL 'tierNident' column
+#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
+#' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
+#' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
+#' or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()
+#' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
+#' currently, sum, count, mean, and median are supported
+#' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_Centroids
+#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @return only pvclust object
+#' @export
+binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
+                                distance_method = 'euclidean', centroid_method = 'mean', 
+                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
+
+    if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
+      centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
+
+      result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
+
+      return(result)
+    }
+
+    else {
+      message(sprintf('%s isnt an ARBOL implemented reduction for tree building, or does not exist in srobj@reductions',tree_reduction))
+    }
+  
+}
+
 
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
@@ -612,12 +645,10 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
 #' then join data frame of data.tree to restore annotations.
 #' requires 'n' and 'pathString' annotations in data.tree
 #' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
-#' 1) write data.tree object to Newick using custom Newick function,
-#' 2) read Newick into ape tree object
-#' 3) ggraph::as_tbl_graph to convert from ape to ggraph
-#' 4) data.tree to node-level dataframe 
-#' 5) join node-level dataframe to tbl_graph nodes
-#' The use of ToNewick is a major bottleneck in computation speed right now
+#' 1) write data.tree object to dend object using custom as.dendrogram.Node function,
+#' 2) convert dendrogram structure object to ggraph using ggraph::as_tbl_graph
+#' 3) left join heights, categories, diversities, and counts to tbl_graph object
+#' previous version data.tree_to_ggraphNW used highly inefficient newick text conversion for tree structure
 data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heightAttribute = 'plotHeight') {
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
   x <- as_tbl_graph(datadend)
@@ -631,7 +662,12 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heig
 }
 
 #' Merges tierNidents with their nearest neighbors in a binary tree if their sample diversity and number of cells do not meet thresholds
+#' Directly prunes srobj-attached binary tree. 
+#' We suggest re-calculating tree (or just ggraph for viz) from here using sr_binarytree() or remake_ggraph(), 
+#' so that new endclusters are treated as leaf nodes
 #' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
+#' @param size_threshold cluster size below which to prune nodes from tree
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
 #' @examples
 #' srobj <- MergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
@@ -659,13 +695,79 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   return(srobj)
 }
 
-#' Merges tierNidents with their nearest neighbors in a binary tree by custom thresholds
+#' Merge based on sample diversity and endclust size, only outputting new end-clusters per cell
 #' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
+#' @param size_threshold cluster size below which to prune nodes from tree
+#' @return dataframe with 2 columns, cellid and new endcluster
+#' @examples
+#' srobj <- MergeEndclustsIdents(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
+#' @export
+MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_threshold) {
+
+  workingTree <- Clone(srobj@misc$binarytree)
+  #DataTree::Prune chops all nodes that don't meet a threshold
+  Prune(workingTree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
+  Prune(workingTree, pruneFun = function(x) x$n > size_threshold)
+
+  #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
+  Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
+
+  divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+
+  divdf2 <- divdf2 %>% rename(CellID=ids,mIdent = pathString)
+  divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
+  divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
+        
+  return(divdf3)
+}
+
+#' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds
+#' We suggest re-calculating tree (or just ggraph for viz) from here using sr_binarytree() or remake_ggraph(), 
+#' so that new endclusters are treated as leaf nodes
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param threshold_attributes list of srobj metadata columns to threshold on
+#' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
 #' @examples
-#' srobj <- MergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
+#' srobj <- MergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
 #' @export
 MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
+
+  srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
+  #DataTree::Prune chops all nodes that don't meet a threshold
+  for (z in seq(1,length(threshold_attributes))) {
+    Prune(srobj@misc$binarytree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
+  } 
+
+  #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
+  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
+
+  divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+
+  divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
+  divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
+
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
+                     rename(tierNident=mergedIdent,rawIdent=tierNident)
+
+  return(srobj)
+}
+
+#' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds, 
+#' outputs dataframe of new idents
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param threshold_attributes list of srobj metadata columns to threshold on
+#' @param thresholds list of threshold values to prune, in same order as threshold_attributes
+#' @return dataframe of new idents
+#' @examples
+#' mIdents <- MergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+#' @export
+MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) {
 
   srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold

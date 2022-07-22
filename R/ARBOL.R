@@ -6,6 +6,7 @@ require(data.table)
 require(glmGamPoi)
 require(future)
 require(harmony)
+require(cluster)
 
 #' Performs iterative clustering (ARBOL) on a v4 Seurat object
 #'
@@ -46,7 +47,8 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
                               saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
                               min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
-                              tierAllowedRecomb=0,harmony_var=NULL, DownsampleNum = 7500) {
+                              res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 2, res_scan_n = 40,
+                              tierAllowedRecomb=0, harmony_var=NULL, DownsampleNum = 7500) {
   ######################################################################################################
   #' make sure output directories exist
   ######################################################################################################
@@ -123,7 +125,8 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
                                      assay=cluster_assay,
                                      PreProcess_fun = PreProcess_fun,
                                      downsample_num = DownsampleNum,
-                                     figdir=figdir, harmony_var = harmony_var)
+                                     figdir=figdir, harmony_var = harmony_var,
+                                     res.low = res_scan_min, res.high=res_scan_max, res.n = res_scan_n, res.step = res_scan_step)
             },
             error = function(e) {message('Resolution choice failure'); print(paste("Resolution choice error: ", e))
           })
@@ -209,6 +212,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
                   tierAllowedRecomb_preserve = tierAllowedRecomb
                   harmony_var_preserve = harmony_var
                   preprocess_preserve = PreProcess_fun
+                  clustfun_preserve = ChooseOptimalClustering_fun
                   GenTieredClusters(srobj,
                                     cells=colnames(subsets[[i]]),
                                     tier=tier+1, clustN = i-1,
@@ -217,6 +221,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
                                     SaveEndNamesDir = SaveEndNamesDir,
                                     SaveEndFileName = SaveEndFileName,
                                     PreProcess_fun = preprocess_preserve,
+                                    ChooseOptimalClustering_fun = clustfun_preserve,
                                     min_cluster_size=min_preserve,
                                     max_tiers= max_preserve,
                                     EnoughDiffUp = EnoughDiffUp_preserve,
@@ -587,6 +592,7 @@ Plotting <- function(working_srobj,fig_dir=NULL, ...) {
 #' @param res.low lowest resolution to include in parameter scan
 #' @param res.high highest resolution
 #' @param res.n number of resolutions to test
+#' @param res.step number of resolution steps before testing for local maximum. used to reduce runtime.
 #' @param bias bias toward resolution choice, when resolution results are similar
 #' @param figdir directory to save results graphs
 #' @return seurat object with slot misc$resolution.choice
@@ -594,7 +600,7 @@ Plotting <- function(working_srobj,fig_dir=NULL, ...) {
 
 chooseResolution_SilhouetteAnalysisParameterScan <- function(
   input.srobj, assay=cluster_assay, n.pcs = input.srobj@misc$nPCs, sample.name =  format(Sys.time(), "%a-%b-%d-%X-%Y-%Z"),
-  res.low = .01, res.high=3, res.n = 40, bias = "under", figdir=NULL) {
+  res.low = res.low, res.high=res.high, res.n = res.n, res.step = res.step, bias = "under", figdir=NULL) {
   
   ######## step 1: save the input seurat object as a new temporary object, 
   ########         dont want to overwrite or change the original one with all of the parameter scans
@@ -602,92 +608,99 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
   srobj.tmp = input.srobj 
   # in case there have been other things calculated in the metadata, just cut down to simplify/avoid errors
   srobj.tmp@meta.data = srobj.tmp@meta.data[,c("nCount_RNA","nFeature_RNA")] # should just be the nUMI and nGene  
-  
-  ######## step 2: calculate the FindClusters over a large range of resolutions
-  print("Performing parameter scan over multiple resolutions...")
+
+  # set up empty additive data structures for silhouette scan
 
   set.res = round(exp(seq(log(res.low), log(res.high), length.out=res.n)), digits=3)
-  
-  srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[1], verbose=FALSE)
-  
+
   res.that.work <- rep(T, length(set.res))
-  for(i in 2:length(set.res)){
-    tryCatch({
-      srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[i], verbose=FALSE)
-    }, error = function(e) {res.that.work[i] <<- F; message(paste("errored on", set.res[i], "flagging that resolution as it doesn't work"))})
-    print(paste("          ", round(100*i/length(set.res)), "% done with parameter scan", sep=""))
-  }
-  set.res <- set.res[res.that.work]
-  
-  
-  ######## step 3: output plot of how the resolution changes the number of clusters you get
-  n.clusters = vector(mode="numeric", length=length(set.res))
-  names(n.clusters) = set.res
 
-  for(i in 1:length(n.clusters)){
-    n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
-  }
-  
-
-
-  ######## step 4: calculate the silhouette width for each resolution
-  print("Computing a silhouette width for each cell, for each resolution...")
-  require(cluster)
   dist.temp = cor(t(srobj.tmp@reductions$pca@cell.embeddings[,n.pcs]), method="pearson")
-  # consider changing to sampling 10% of each cluster, runs into issues calc silhouette score if there is only 1 cell in each cluster
   random.cells.choose = if ( nrow(dist.temp) > 500 ) sample(1:nrow(dist.temp), round(nrow(dist.temp)/10, digits=0)) else 1:nrow(dist.temp)
   dist.temp.downsample = dist.temp[random.cells.choose, random.cells.choose]
   sil.all.matrix = matrix(data=NA, nrow=nrow(dist.temp.downsample), ncol=0)
-  
 
-  for(i in 1:length(set.res)){
+  
+  ######## step 2: calculate the FindClusters over resolutions 
+  print("Performing parameter scan over multiple resolutions...")
+
+  for (i in 1:length(set.res)) {
+
+    #tryCatch allows testing resolutions that might cause errors in algorithm
+    tryCatch({
+        srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[i], verbose=FALSE)
+      }, error = function(e) {res.that.work[i] <<- F; message(paste("errored on", set.res[i], "flagging that resolution as it doesn't work"))})
+    print(paste("          ", round(100*i/length(set.res)), "% done with parameter scan", sep=""))
+    #if an error is encountered, skip this resolution and don't add it to the testing matrix
+    if (res.that.work[i] == F) {
+      next
+    }
+
+    ######## step 3: calculate the silhouette width for each resolution (iterated in for loop)
+    print("Computing a silhouette width for each cell")
     
     clusters.temp = as.numeric(as.vector(
       srobj.tmp@meta.data[random.cells.choose,paste0(assay, "_snn_res.", set.res[i])]))
     if(length(table(clusters.temp))>1){
       sil.out = silhouette(clusters.temp, as.dist(1-as.matrix(dist.temp.downsample)))
       sil.all.matrix = cbind(sil.all.matrix, sil.out[,3])
+
     }
     if(length(table(clusters.temp))==1){
       sil.all.matrix = cbind(sil.all.matrix, rep(0, length(clusters.temp)))
     }
-    print(paste("          ", round(100*i/length(set.res)), "% done with silhouette calculation", sep=""))
+    
+      #only perform calculations if you've done more iterations than res.step (res.step < 2 will throw errors)
+    if (i > res.step) {
+        sil.average <- setNames(colMeans(sil.all.matrix), set.res[1:i])
+        sil.medians <- setNames(apply(sil.all.matrix, 2, median), set.res[1:i])
+
+        ######## step 4: automate choosing resolution that maximizes the silhouette 
+        hist.out = hist(sil.average, length(sil.average)/1.2,  plot=FALSE)
+
+        #  take the ones that fall into the top bin, 
+        #  and the max OR MIN of those  ******* can change this to under vs over cluster
+
+        if(bias=="over"){
+            resolution.choice = as.numeric(max(
+            names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
+          }
+        if(bias=="under"){
+            resolution.choice = as.numeric(min(
+            names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
+          }
+
+        if (sil.average[i] < sil.average[i-1] & 
+        !(is.unsorted(-sil.average[(i-(res.step-1)):i], FALSE))) {
+            message("found early stopping point in silhouette analysis")
+            break
+        }
+     }
     
   }
-  
-  
+
+ 
   ######## step 5: calculate summary metric to compare the silhouette distributions,
   ########         average has worked well so far... could get fancier
   
-  print("Identifying a best resolution to maximize silhouette width")
-  sil.average = setNames(colMeans(sil.all.matrix), set.res)
-  sil.medians <- setNames(apply(sil.all.matrix, 2, median), set.res)
-  
-  ######## step 6: automate choosing resolution that maximizes the silhouette 
-  hist.out = hist(sil.average, length(sil.average)/1.2,  plot=FALSE)
-  
-  #  take the ones that fall into the top bin, 
-  #  and the max OR MIN of those  ******* can change this to under vs over cluster
-  if(bias=="over"){
-    resolution.choice = as.numeric(max(
-      names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
-  }
-  if(bias=="under"){
-    resolution.choice = as.numeric(min(
-      names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
-  }
-  
   # get the silhouette of the best resolution: 
   silhouette.best = as.numeric(sil.average[paste(resolution.choice)])
-  
+
+  n.clusters = vector(mode="numeric", length=length(set.res[1:i]))
+  names(n.clusters) = set.res[1:i]
+
+  for(z in 1:length(n.clusters)){
+    n.clusters[z] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[z])])))
+  }
+    
   print(paste("Best Resolution Choice: ", resolution.choice, ", with average silhouette score of: ",
               round(silhouette.best, digits=3), ", giving ", as.numeric(n.clusters[paste(resolution.choice)]),
               " clusters", sep=""))
-  
-  ######### step 7: output plot and data 
+
+  ######### step 6: output plot and data 
   
   if (!is.null(figdir)) {
-    
+
     print(paste0("Ouptutting summary statistics and returning seurat object... ",
                  "This will create a pdf in your output directory,",
                  " and will return your input seurat object amended with the best choice",
@@ -719,7 +732,7 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
     dev.off()
   }
   
-  ######## step 8: return the original seurat object, with the metadata containing a 
+  ######## step 7: return the original seurat object, with the metadata containing a 
   ########         concatenated vector with the clusters defined by the best choice here,
   ########         as well as the ident set to this new vector
   
@@ -729,103 +742,116 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
   Idents(input.srobj) = input.srobj$Best.Clusters
   input.srobj@misc <- list("resolution.choice" = resolution.choice)
   return(input.srobj)
+
 }
+
 
 chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
   input.srobj, assay=cluster_assay, n.hvs = input.srobj@misc$nHVs, sample.name =  format(Sys.time(), "%a-%b-%d-%X-%Y-%Z"),
-  res.low = .01, res.high=3, res.n = 40, bias = "under", figdir=NULL) {
+  res.low = res_scan_min, res.high=res_scan_max, res.n = res_scan_n, res.step = res_scan_step, bias = "under", figdir=NULL) {
   
   ######## step 1: save the input seurat object as a new temporary object, 
   ########         dont want to overwrite or change the original one with all of the parameter scans
+  
   srobj.tmp = input.srobj 
   # in case there have been other things calculated in the metadata, just cut down to simplify/avoid errors
   srobj.tmp@meta.data = srobj.tmp@meta.data[,c("nCount_RNA","nFeature_RNA")] # should just be the nUMI and nGene  
+
+  # set up empty additive data structures for silhouette scan
+
+  set.res = round(exp(seq(log(res.low), log(res.high), length.out=res.n)), digits=3)
+
+  res.that.work <- rep(T, length(set.res))
+
+  dist.temp = cor(t(srobj.tmp@reductions$harmony@cell.embeddings[,n.hvs]), method="pearson")
+  random.cells.choose = if ( nrow(dist.temp) > 500 ) sample(1:nrow(dist.temp), round(nrow(dist.temp)/10, digits=0)) else 1:nrow(dist.temp)
+  dist.temp.downsample = dist.temp[random.cells.choose, random.cells.choose]
+  sil.all.matrix = matrix(data=NA, nrow=nrow(dist.temp.downsample), ncol=0)
+
   
   ######## step 2: calculate the FindClusters over a large range of resolutions
   print("Performing parameter scan over multiple resolutions...")
 
-  set.res = round(exp(seq(log(res.low), log(res.high), length.out=res.n)), digits=3)
-  
-  srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[1], verbose=FALSE)
-  
-  res.that.work <- rep(T, length(set.res))
-  for(i in 2:length(set.res)){
+  for (i in 1:length(set.res)) {
+
+    #tryCatch allows testing resolutions that might cause errors in algorithm
     tryCatch({
-      srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[i], verbose=FALSE)
-    }, error = function(e) {res.that.work[i] <<- F; message(paste("errored on", set.res[i], "Flagging that resolution as it doesn't work"))})
+        srobj.tmp = FindClusters(srobj.tmp, resolution=set.res[i], verbose=FALSE)
+      }, error = function(e) {res.that.work[i] <<- F; message(paste("errored on", set.res[i], "flagging that resolution as it doesn't work"))})
     print(paste("          ", round(100*i/length(set.res)), "% done with parameter scan", sep=""))
-  }
-  set.res <- set.res[res.that.work]
-  
-  
-  ######## step 3: output plot of how the resolution changes the number of clusters you get
-  n.clusters = vector(mode="numeric", length=length(set.res))
-  names(n.clusters) = set.res
+    #if an error is encountered, skip this resolution and don't add it to the testing matrix
+    if (res.that.work[i] == F) {
+      next
+    }
 
-  for(i in 1:length(n.clusters)){
-    n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
-  }
-  
-
-
-  ######## step 4: calculate the silhouette width for each resolution
-  print("Computing a silhouette width for each cell, for each resolution...")
-  require(cluster)
-  dist.temp = cor(t(srobj.tmp@reductions$harmony@cell.embeddings[,n.hvs]), method="pearson")
-  # consider changing to sampling 10% of each cluster, runs into issues calc silhouette score if there is only 1 cell in each cluster
-  random.cells.choose = if ( nrow(dist.temp) > 500 ) sample(1:nrow(dist.temp), round(nrow(dist.temp)/10, digits=0)) else 1:nrow(dist.temp)
-  dist.temp.downsample = dist.temp[random.cells.choose, random.cells.choose]
-  sil.all.matrix = matrix(data=NA, nrow=nrow(dist.temp.downsample), ncol=0)
-  
-
-  for(i in 1:length(set.res)){
+    ######## step 3: calculate the silhouette width for each resolution (iterated in for loop)
+    print("Computing a silhouette width for each cell")
     
     clusters.temp = as.numeric(as.vector(
       srobj.tmp@meta.data[random.cells.choose,paste0(assay, "_snn_res.", set.res[i])]))
     if(length(table(clusters.temp))>1){
       sil.out = silhouette(clusters.temp, as.dist(1-as.matrix(dist.temp.downsample)))
       sil.all.matrix = cbind(sil.all.matrix, sil.out[,3])
+
     }
     if(length(table(clusters.temp))==1){
       sil.all.matrix = cbind(sil.all.matrix, rep(0, length(clusters.temp)))
     }
-    print(paste("          ", round(100*i/length(set.res)), "% done with silhouette calculation", sep=""))
     
+      #only perform calculations if you've done more iterations than res.step (res.step < 2 will throw errors)
+    if (i > res.step) {
+        sil.average <- setNames(colMeans(sil.all.matrix), set.res[1:i])
+        sil.medians <- setNames(apply(sil.all.matrix, 2, median), set.res[1:i])
+
+        ######## step 4: automate choosing resolution that maximizes the silhouette 
+        hist.out = hist(sil.average, length(sil.average)/1.2,  plot=FALSE)
+
+        #  take the ones that fall into the top bin, 
+        #  and the max OR MIN of those  ******* can change this to under vs over cluster
+
+        if(bias=="over"){
+            resolution.choice = as.numeric(max(
+            names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
+          }
+        if(bias=="under"){
+            resolution.choice = as.numeric(min(
+            names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
+          }
+
+        if (sil.average[i] < sil.average[i-1] & 
+        !(is.unsorted(-sil.average[(i-(res.step-1)):i], FALSE))) {
+            message("found early stopping point in silhouette analysis")
+            break
+        }
+     }
   }
-  
-  
-  ######## step 5: calculate summary metric to compare the silhouette distributions,
-  ########         average has worked well so far... could get fancier
-  
-  print("Identifying a best resolution to maximize silhouette width")
-  sil.average = setNames(colMeans(sil.all.matrix), set.res)
-  sil.medians <- setNames(apply(sil.all.matrix, 2, median), set.res)
-  
-  ######## step 6: automate choosing resolution that maximizes the silhouette 
-  hist.out = hist(sil.average, length(sil.average)/1.2,  plot=FALSE)
-  
-  #  take the ones that fall into the top bin, 
-  #  and the max OR MIN of those  ******* can change this to under vs over cluster
-  if(bias=="over"){
-    resolution.choice = as.numeric(max(
-      names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
-  }
-  if(bias=="under"){
-    resolution.choice = as.numeric(min(
-      names(sil.average[which(sil.average>hist.out$breaks[length(hist.out$breaks)-1])])))
-  }
-  
-  # get the silhouette of the best resolution: 
-  silhouette.best = as.numeric(sil.average[paste(resolution.choice)])
-  
-  print(paste("Best Resolution Choice: ", resolution.choice, ", with average silhouette score of: ",
-              round(silhouette.best, digits=3), ", giving ", as.numeric(n.clusters[paste(resolution.choice)]),
-              " clusters", sep=""))
+
+    ######## step 5: calculate summary metric to compare the silhouette distributions,
+    ########         average has worked well so far... could get fancier
+    
+    # get the silhouette of the best resolution: 
+    silhouette.best = as.numeric(sil.average[paste(resolution.choice)])
+
+    n.clusters = vector(mode="numeric", length=length(set.res[1:i]))
+    names(n.clusters) = set.res[1:i]
+
+    for(z in 1:length(n.clusters)){
+      n.clusters[z] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[z])])))
+    }
+    
+    print(paste("Best Resolution Choice: ", resolution.choice, ", with average silhouette score of: ",
+                round(silhouette.best, digits=3), ", giving ", as.numeric(n.clusters[paste(resolution.choice)]),
+                " clusters", sep=""))
   
   ######### step 7: output plot and data 
   
   if (!is.null(figdir)) {
-    
+        ######## step 3: output plot of how the resolution changes the number of clusters you get
+
+    for(i in 1:length(n.clusters)){
+      n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
+    }
+
     print(paste0("Ouptutting summary statistics and returning seurat object... ",
                  "This will create a pdf in your output directory,",
                  " and will return your input seurat object amended with the best choice",
@@ -868,7 +894,6 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
   input.srobj@misc <- list("resolution.choice" = resolution.choice)
   return(input.srobj)
 }
-
 
 #' Wraps GenTieredClusters in a larger script to output a cell-level dataframe of cluster identity through the tree.
 #'
@@ -905,6 +930,7 @@ ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
                               saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
                               min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
+                              res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 2, res_scan_n = 40,
                               tierAllowedRecomb=0,harmony_var=NULL, DownsampleNum = 7500) {
 
   tieredsrobjs <- GenTieredClusters(srobj = srobj, cluster_assay = cluster_assay, cells = cells, tier = tier, clustN = clustN,
@@ -912,16 +938,20 @@ ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_fun,
                               saveSROBJdir = saveSROBJdir, figdir = figdir, SaveEndNamesDir = SaveEndNamesDir, SaveEndFileName = SaveEndFileName,
                               min_cluster_size = min_cluster_size, max_tiers = max_tiers, EnoughDiffUp = EnoughDiffUp, EnoughDiffDown = EnoughDiffDown,
+                              res_scan_step = res_scan_step, res_scan_min = res_scan_min, res_scan_max = res_scan_max, res_scan_n = res_scan_n,
                               tierAllowedRecomb = tierAllowedRecomb, harmony_var=harmony_var, DownsampleNum = DownsampleNum)
 
   srobjslist <- unlist(tieredsrobjs)
-
-  tierNidents <- lapply(srobjslist, function(tsrobj) {
-    tryCatch({
-      idents <- tsrobj@meta.data %>% mutate(CellID=row.names(tsrobj@meta.data)) %>% dplyr::select(CellID,tierNident)
-      return(idents)
+  tryCatch({
+    tierNidents <- lapply(srobjslist, function(tsrobj) {
+      tryCatch({
+        idents <- data.frame(CellID=row.names(tsrobj@meta.data),tierNident=tsrobj@meta.data$tierNident)
+        return(idents)
+      })
     })
-  })
+  },
+    error = function(e) {message('unnesting srobjs failed, probably because clustering failed. reason:'); print(e)}
+  )
 
   endclustDF <- bind_rows(tierNidents)
   endclustDF$tierNident <- sub('_T0C0_', '',endclustDF$tierNident)
