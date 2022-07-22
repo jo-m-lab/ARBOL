@@ -34,6 +34,10 @@ require(cluster)
 #' @param EnoughDiffDown minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped. defaults to 5
 #' @param tierAllowedRecomb minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low.
 #' @param ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution 
+#' @param res_scan_step number of resolutions of decreasing score before an early silhouette analysis resolution scan stop
+#' @param res_scan_min the smallest resolution to scan
+#' @param res_scan_max the highest resolution to scan (default is 3 due to legacy, we recommend lowering this)
+#' @param res_scan_n the number of resolutions to scan. A logarithmic sequence of numbers between min and max are scanned
 #' @param saveSROBJdir where to save seurat objects for each tier and cluster, if null does not save
 #' @param figdir where to save QC figures for each tier and cluster, if null does not save
 #' @param saveEndNamesDir where to save directory of end clusters, if null does not save
@@ -47,7 +51,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
                               saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
                               min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
-                              res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 2, res_scan_n = 40,
+                              res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 3, res_scan_n = 40,
                               tierAllowedRecomb=0, harmony_var=NULL, DownsampleNum = 7500) {
   ######################################################################################################
   #' make sure output directories exist
@@ -917,6 +921,10 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 #' @param EnoughDiffDown minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped. defaults to 5
 #' @param tierAllowedRecomb minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low.
 #' @param ChooseOptimalClustering_fun function that returns srobj with clusters in `srobj$Best.Clusters` after choosing optimal clustering resolution 
+#' @param res_scan_step number of resolutions of decreasing score before an early silhouette analysis resolution scan stop
+#' @param res_scan_min the smallest resolution to scan
+#' @param res_scan_max the highest resolution to scan (default is 3 due to legacy, we recommend lowering this)
+#' @param res_scan_n the number of resolutions to scan. A logarithmic sequence of numbers between min and max are scanned
 #' @param saveSROBJdir where to save seurat objects for each tier and cluster, if null does not save
 #' @param figdir where to save QC figures for each tier and cluster, if null does not save
 #' @param saveEndNamesDir where to save directory of end clusters, if null does not save
@@ -930,7 +938,7 @@ ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
                               saveSROBJdir=NULL, figdir=NULL, SaveEndNamesDir=NULL, SaveEndFileName=NULL,
                               min_cluster_size = 100, max_tiers = 10, EnoughDiffUp = 5, EnoughDiffDown = 5,
-                              res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 2, res_scan_n = 40,
+                              res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 3, res_scan_n = 40,
                               tierAllowedRecomb=0,harmony_var=NULL, DownsampleNum = 7500) {
 
   tieredsrobjs <- GenTieredClusters(srobj = srobj, cluster_assay = cluster_assay, cells = cells, tier = tier, clustN = clustN,
