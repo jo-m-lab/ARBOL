@@ -284,7 +284,7 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
   ARBOLphylo$edge.length <- rep(1,ARBOLphylo$edge.length %>% length)
 
   #convert to tbl_graph object to allow easy plotting with ggraph
-  x <- as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
+  x <- tidygraph::as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
       left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols)))
 
   x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% select(to=i))
@@ -624,7 +624,7 @@ cosine <- function(x) {
 #' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
 #' 1) write data.tree object to Newick using custom Newick function,
 #' 2) read Newick into ape tree object
-#' 3) ggraph::as_tbl_graph to convert from ape to ggraph
+#' 3) tidygraph::as_tbl_graph to convert from ape to ggraph
 #' 4) data.tree to node-level dataframe 
 #' 5) join node-level dataframe to tbl_graph nodes
 #' The use of ToNewick is a major bottleneck in computation speed right now
@@ -635,7 +635,7 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
   treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
   treeDF <- treeDF %>% select(name=pathString,n,i,plotHeight,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
-  x <- as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
+  x <- tidygraph::as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
 }
@@ -646,17 +646,16 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
 #' requires 'n' and 'pathString' annotations in data.tree
 #' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
 #' 1) write data.tree object to dend object using custom as.dendrogram.Node function,
-#' 2) convert dendrogram structure object to ggraph using ggraph::as_tbl_graph
+#' 2) convert dendrogram structure object to ggraph using tidygraph::as_tbl_graph
 #' 3) left join heights, categories, diversities, and counts to tbl_graph object
 #' previous version data.tree_to_ggraphNW used highly inefficient newick text conversion for tree structure
 data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heightAttribute = 'plotHeight') {
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
-  x <- as_tbl_graph(datadend)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
   treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
   treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
-  x <- as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
+  x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
 }
@@ -736,24 +735,27 @@ MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 #' @export
 MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
-  srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
+ workingTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
   for (z in seq(1,length(threshold_attributes))) {
-    Prune(srobj@misc$binarytree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
+    Prune(workingTree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
   } 
 
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
-  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
+  Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
+  divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
   divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
 
-  divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
-  divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
+  divdf2 <- divdf2 %>% rename(CellID=ids,mIdent = pathString)
+  divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
+  divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
-                     rename(tierNident=mergedIdent,rawIdent=tierNident)
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdf3)
+  srobj@meta.data$rawIdent <- srobj@meta.data$tierNident
+  srobj@meta.data$tierNident <- srobj@meta.data$mIdent
+  srobj@meta.data <- srobj@meta.data %>% select(-mIdent)      
 
   return(srobj)
 }
@@ -769,26 +771,24 @@ MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 #' @export
 MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) {
 
-  srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
+  workingTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
   for (z in seq(1,length(threshold_attributes))) {
-    Prune(srobj@misc$binarytree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
+    Prune(workingTree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
   } 
 
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
-  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
+  Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
+  divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
   divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
 
-  divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
-  divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
+  divdf2 <- divdf2 %>% rename(CellID=ids,mIdent = pathString)
+  divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
+  divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
-                     rename(tierNident=mergedIdent,rawIdent=tierNident)
-
-  return(srobj)
+  return(divdf3)
 }
 
 #' Converts pvclust tree object to dataframe with row per node
