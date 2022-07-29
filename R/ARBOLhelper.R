@@ -27,6 +27,7 @@ ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
 
   deparse <- function(x) {
     name <- stringi::stri_replace_all_fixed(x$pathString, " ", "_")
+    name <- stringi::stri_replace_all_fixed(x$pathString, "/", ".")
     name <- stringi::stri_replace_all_fixed(name, ",", "")
     if(!isRoot(x) && length(heightAttribute) > 0) {
       edge <- GetAttribute(x$parent, heightAttribute, ...) - GetAttribute(x, heightAttribute, ...) 
@@ -51,6 +52,22 @@ ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
   return (res)
   
 }
+
+#Very slow, newick way
+as.phylo.NodeNW <- function(x, heightAttribute = DefaultPlotHeight, ...) {
+  txt <- ToNewickPS(x, heightAttribute)
+  return (ape::read.tree(text = txt))
+}
+
+#fast data.tree.Node to ape tree object conversion
+as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
+  datadend <- as.dendrogram.NodePS(x, heightAttribute = heightAttribute)
+  order.dendrogram(datadend) <- seq(1,length(na.omit(get_nodes_attr(datadend, "label"))))
+  result = as.phylo(datadend)
+  labels(result) <- labels(result) %>% str_replace_all('/','.')
+  return(result)
+}
+
 
 #' data.tree to ggraph object conversion with custom Node->dendrogram function that uses pathString as node names. 
 #' @param object A data tree object
