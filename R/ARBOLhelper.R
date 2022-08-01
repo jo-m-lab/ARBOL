@@ -699,10 +699,10 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
   divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
-  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
-  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
-  divdf2 <- divdf2 %>% rename(CellID=ids,binIdent = pathString)
+  divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,binIdent = pathString)
   divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
 
   srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
@@ -730,10 +730,10 @@ MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
   Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
   divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
-  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
-  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
-  divdf2 <- divdf2 %>% rename(CellID=ids,mIdent = pathString)
+  divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,mIdent = pathString)
   divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
   divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
         
@@ -746,7 +746,8 @@ MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 #' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
-#' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
+#' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent 
+#' and a merged data.tree object in srobj@@misc$workingTree
 #' @examples
 #' srobj <- MergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
 #' @export
@@ -762,10 +763,10 @@ MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
   Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
   divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
-  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
-  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
-  divdf2 <- divdf2 %>% rename(CellID=ids,mIdent = pathString)
+  divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,mIdent = pathString)
   divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
   divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
 
@@ -773,6 +774,8 @@ MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
   srobj@meta.data$rawIdent <- srobj@meta.data$tierNident
   srobj@meta.data$tierNident <- srobj@meta.data$mIdent
   srobj@meta.data <- srobj@meta.data %>% select(-mIdent)      
+
+  srobj@misc$workingTree <- workingTree
 
   return(srobj)
 }
@@ -798,10 +801,10 @@ MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
   Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
   divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
-  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest
-  divdf2 <- divdf2 %>% group_by(ids) %>% slice(which.min(height)) %>% ungroup
+  divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
+  divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
-  divdf2 <- divdf2 %>% rename(CellID=ids,mIdent = pathString)
+  divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,mIdent = pathString)
   divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
   divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
 

@@ -33,7 +33,8 @@ Depends:
 	ggnewscale,
 	glmGamPoi,
 	strex,
-    cluster
+    cluster,
+    dendextend
 Remotes:
 	jo-m-lab/ARBOL
 License: GPL
