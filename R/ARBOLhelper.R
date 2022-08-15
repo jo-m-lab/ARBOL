@@ -428,7 +428,6 @@ binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'com
 
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' default method creates a tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
-#' Also adds metrics used in building tree to seurat object in case needed for downstream applications
 #' @param srobj a seurat object with ARBOL 'tierNident' column
 #' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
@@ -520,6 +519,7 @@ get_centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 
 #' Creates binary tree object for ARBOL run, adds it to seurat object along with a graph of it
 #' calls sr_binarytree() in which assay + methods for tree building are called
+#' Also adds metrics used in building tree to seurat object in case needed for downstream applications
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
 #' @param categories categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
 #' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
