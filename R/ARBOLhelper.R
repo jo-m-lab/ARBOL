@@ -254,7 +254,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 }
 
 #' Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it
-#' calls prepARBOLmeta_tree() and prepTree()
+#' calls prepARBOLmeta_tree() and propagate_tree()
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', and 'sample' columns. 
 #' @param categories columns in metadata for which you want to track categories present per node. Also finds the majority per node
 #' @param diversities columns in metadata for which you want to calculate diversity per node 
@@ -285,7 +285,7 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
   ARBOLtree <- as.Node(treemeta) 
 
-  Atree <- prepTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts)
+  Atree <- propagate_tree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts)
 
   #obtain counts columns from propagated data tree
   attrs <- Atree$attributesAll
@@ -333,9 +333,9 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 #' added as node$attribute_diversity
 #' @return data.tree object with attributes propagated to all nodes
 #' @examples
-#' arbolTree <- prepTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
+#' arbolTree <- propagate_tree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
 #' @export
-prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample', diversity_metric = 'simpson') {
+propagate_tree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample', diversity_metric = 'simpson') {
 
     #calculate number of children per node
     ARBOLtree$Do(function(node) node$numChildren <- node$children %>% length)
@@ -402,7 +402,7 @@ prepTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_at
 #' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_Centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_centroids
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return only pvclust object
 #' @export
@@ -411,7 +411,7 @@ binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'com
                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
-      centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+      centroids <- get_centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
@@ -436,7 +436,7 @@ binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'com
 #' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_Centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_centroids
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
@@ -449,7 +449,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
-      centroids <- get_Centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+      centroids <- get_centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
@@ -476,7 +476,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
 #' @examples
 
 #' @export
-get_Centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+get_centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {
 
     srobj_meta <- srobj@meta.data
@@ -565,38 +565,10 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
-  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
+  divtree <- tree_allotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
+                                diversity_metric = diversity_metric, counts = counts)
 
-  jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
-            dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
-
-  categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),','))))
-
-  divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
-
-  jointb <- jointb %>% select(-all_of(categories)) %>% 
-              summarize(ids = list(CellID),n=unique(n))
-
-  numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
-
-  for (x in counts) {
-    attribute <- enquo(x)
-    tierNcount <- numericaltb %>% group_by(tierNident) %>% count(.data[[attribute]])
-    vals <- unique(tierNcount[[x]])
-    countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
-    colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
-    numericaltb <- numericaltb %>% left_join(countWide)
-  }
-
-  numericaltb[is.na(numericaltb)] <- 0
-
-  numericaltb <- numericaltb %>% select(-CellID,-sample,-all_of(counts)) %>% distinct
-
-  finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
-
-  divtree <- as.Node(finaltreedf)
-
-  divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
+  divtree <- propagate_tree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts)
 
   x <- data.tree_to_ggraph(divtree, categories, diversities, counts)
@@ -675,6 +647,51 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heig
   x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
+}
+
+#' Allots seurat object metadata attributes to a data.tree object
+#' Once attributes are alloted, propagate_tree should be run to propagate attributes up the tree.
+#' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
+#' @param categories categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
+#' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
+#' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
+#' @param counts attributes for which to count unique values per node.
+#' @return
+#' @export
+tree_allotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts) {
+  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
+
+  jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
+          dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
+
+  categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),','))))
+
+  divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
+
+  jointb <- jointb %>% select(-all_of(categories)) %>% 
+            summarize(ids = list(CellID),n=unique(n))
+
+  numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
+
+  for (x in counts) {
+  attribute <- enquo(x)
+  tierNcount <- numericaltb %>% group_by(tierNident) %>% count(.data[[attribute]])
+  vals <- unique(tierNcount[[x]])
+  countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
+  colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
+  numericaltb <- numericaltb %>% left_join(countWide)
+  }
+
+  numericaltb[is.na(numericaltb)] <- 0
+
+  numericaltb <- numericaltb %>% select(-CellID,-sample,-all_of(counts)) %>% distinct
+
+  finaltreedf <- treedf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
+
+  tree <- as.Node(finaltreedf)
+
+  return(tree)
+
 }
 
 #' Merges tierNidents with their nearest neighbors in a binary tree if their sample diversity and number of cells do not meet thresholds
@@ -1022,7 +1039,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   divtree <- as.Node(finaltreedf)
 
-  divtree <- prepTree(divtree,srobj=srobj, categorical_attributes = categories, 
+  divtree <- propagate_tree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts)
 
   srobj@misc$binarytreeggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts)
