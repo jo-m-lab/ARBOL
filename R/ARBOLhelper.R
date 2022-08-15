@@ -427,7 +427,8 @@ binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'com
 
 
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
-#' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
+#' default method creates a tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
+#' Also adds metrics used in building tree to seurat object in case needed for downstream applications
 #' @param srobj a seurat object with ARBOL 'tierNident' column
 #' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
@@ -460,6 +461,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
     else {
       message(sprintf('%s isnt an ARBOL implemented reduction for tree building, or does not exist in srobj@reductions',tree_reduction))
     }
+
 
     return(srobj)
 }
@@ -543,9 +545,10 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
                                 distance_method = 'euclidean', centroid_method = 'mean', 
                                 centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
 
+
   if(is.na(gene_list)) {
     gene_list = rownames(srobj[[centroid_assay]]@data)
-  }
+  } 
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -592,6 +595,19 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   srobj@misc$binarytree <- divtree
   
   srobj@misc$binarytreeggraph <- x
+
+  #add metrics used for tree creation to seurat object
+  srobj@misc$tree_metrics[['diversities']] <- diversities
+  srobj@misc$tree_metrics[['diversity_metric']] <- diversity_metric
+  srobj@misc$tree_metrics[['categories']] <- categories
+  srobj@misc$tree_metrics[['counts']] <- counts
+  srobj@misc$tree_metrics[['tree_reduction']] <- tree_reduction
+  srobj@misc$tree_metrics[['hclust_method']] <- hclust_method
+  srobj@misc$tree_metrics[['distance_method']] <- distance_method
+  srobj@misc$tree_metrics[['centroid_method']] <- centroid_method
+  srobj@misc$tree_metrics[['centroid_assay']] <- centroid_assay
+  srobj@misc$tree_metrics[['reduction_dims']] <- reduction_dims
+  srobj@misc$tree_metrics[['gene_list']] <- gene_list
 
   return(srobj)
 }
