@@ -1,18 +1,5 @@
 #! /usr/bin/Rscript
 
-#require(vegan)
-#require(pvclust)
-#require(reshape2)
-#packages <- c("Seurat","tidyverse","data.table","vegan","Matrix","pvclust",
-#              "reshape2","Matrix.utils","tictoc","ggfortify","ggpubr","ggrepel",
-#              "tidygraph","ggraph","viridis","data.tree","ape","phyloseq","ggalluvial",'scatterpie','ggnewscale')
-
-#loadpak <- function(pkg){  
-#  suppressPackageStartupMessages(sapply(pkg, require, character.only = TRUE))
-#}
-
-#loadpak(packages)
-
 #' data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. 
 #' @param node A data tree object
 #' @return Newick format tree
@@ -65,6 +52,7 @@ as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
   order.dendrogram(datadend) <- seq(1,length(na.omit(get_nodes_attr(datadend, "label"))))
   result = as.phylo(datadend)
   labels(result) <- labels(result) %>% str_replace_all('/','.')
+  result$node.label <- datadend %>% get_nodes_attr('label',include_leaves=F) %>% str_replace_all('/','.') %>% na.omit
   return(result)
 }
 
@@ -279,13 +267,13 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
     counts = c('sample',counts)
   }
 
-  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
+  srobj <- suppressMessages(tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric))
   
-  treemeta <- prepARBOLmeta_tree(srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = counts)
+  treemeta <- suppressMessages(prepARBOLmeta_tree(srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = counts))
 
-  ARBOLtree <- as.Node(treemeta) 
+  ARBOLtree <- suppressMessages(as.Node(treemeta))
 
-  Atree <- propagate_tree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts)
+  Atree <- suppressMessages(propagate_tree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts))
 
   #obtain counts columns from propagated data tree
   attrs <- Atree$attributesAll
