@@ -60,6 +60,7 @@ as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
 as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
   result = as.phylo.Node(x)
   result$node.label <- preppedTree_toDF(tabsILR$trees[[1]],'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
+  return(result)
 }
 
 
