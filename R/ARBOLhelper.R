@@ -59,7 +59,7 @@ as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
 #data.tree.Node to ape tree object conversion with internal nodes named by pathString and leaf nodes named without pathString (only endname)
 as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
   result = as.phylo.Node(x)
-  result$node.label <- preppedTree_toDF(tabsILR$trees[[1]],'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
+  result$node.label <- preppedTree_toDF(x,'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
   return(result)
 }
 
