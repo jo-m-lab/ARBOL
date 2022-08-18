@@ -56,6 +56,12 @@ as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
   return(result)
 }
 
+#data.tree.Node to ape tree object conversion with internal nodes named by pathString and leaf nodes named without pathString (only endname)
+as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
+  result = as.phylo.Node(x)
+  result$node.label <- preppedTree_toDF(tabsILR$trees[[1]],'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
+}
+
 
 #' data.tree to ggraph object conversion with custom Node->dendrogram function that uses pathString as node names. 
 #' @param object A data tree object
