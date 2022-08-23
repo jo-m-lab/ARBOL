@@ -403,13 +403,13 @@ propagate_tree <- function(ARBOLtree, srobj, numerical_attributes = NA, categori
 #' @export
 binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
-                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
+                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), nboot = 1) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
       centroids <- get_centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
-      result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
+      result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=nboot)
 
       return(result)
     }
@@ -441,13 +441,13 @@ binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'com
 #' @export
 sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
-                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
+                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), nboot = 1) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
       centroids <- get_centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
-      result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=1)
+      result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=nboot)
 
       srobj@misc$pvclust <- result
     }
@@ -530,6 +530,7 @@ get_centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' @param gene_list if using cell x gene data (not any srobj@@reduction), list of genes to include in centroid calculation. 
 #' defaults to all genes in centroid_assay if no input is given
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param nboot number of bootstraps for pvclust() function. defaults to 1 for speed
 #' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
 #' @examples
 #' srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
@@ -538,7 +539,8 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
                                 diversity_metric = 'simpson', counts = 'sample',
                                 tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
-                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data)) {
+                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), 
+                                nboot = 1) {
 
 
   if(is.na(gene_list)) {
@@ -559,7 +561,7 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   
   srobj <- sr_binarytree(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
                           distance_method = distance_method, centroid_method = centroid_method, 
-                          centroid_assay = centroid_assay, gene_list = gene_list, reduction_dims = reduction_dims)
+                          centroid_assay = centroid_assay, gene_list = gene_list, reduction_dims = reduction_dims, nboot = nboot)
 
   binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
 
@@ -849,6 +851,8 @@ bintree_to_df <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
   binarydf <- data.frame(ToDataFrameTree(bintree, 'pathString','plotHeight'))
   colnames(binarydf) <- c('remove','pathString','plotHeight')
+  #following line is heuristic and causes wrapper functions to crash if tierNident has / in it. Can cause problems with curatednames!
+  #need a warning line in wrapper functions or something
   binarydf$tierNident <- sub('.*\\/', '', binarydf$pathString)
   binarydf <- binarydf %>% dplyr::select(-remove)
   return(binarydf)
