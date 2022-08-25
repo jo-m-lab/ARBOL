@@ -635,8 +635,8 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   apeTree <- ape::read.tree(text=txt)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
-  treeDF <- treeDF %>% select(name=pathString,n,i,plotHeight,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
+  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- treeDF %>% select(name=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- tidygraph::as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
@@ -655,8 +655,8 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heig
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
-  treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
+  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
@@ -841,7 +841,7 @@ MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
   return(divdf3)
 }
 
-#' Converts pvclust tree object to dataframe with row per node
+#' Converts pvclust tree object to dataframe with row per node and pvclust p-values
 #' @param pvclust_tree a pvclust or hclust tree 
 #' @return a dataframe with one row per node of the tree
 #' @examples
@@ -849,12 +849,14 @@ MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
 #' @export
 bintree_to_df <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
-  binarydf <- data.frame(ToDataFrameTree(bintree, 'pathString','plotHeight'))
-  colnames(binarydf) <- c('remove','pathString','plotHeight')
+  binarydf <- data.frame(ToDataFrameTree(node, 'pathString','plotHeight','isLeaf'))
+  bin2 <- binarydf %>% filter(!isLeaf) %>% mutate(pval = 1-pvclust_tree$edges$au)
+  binarydf <- binarydf %>% left_join(bin2)
+  colnames(binarydf) <- c('remove','pathString','plotHeight','remove2','pval')
   #following line is heuristic and causes wrapper functions to crash if tierNident has / in it. Can cause problems with curatednames!
   #need a warning line in wrapper functions or something
   binarydf$tierNident <- sub('.*\\/', '', binarydf$pathString)
-  binarydf <- binarydf %>% dplyr::select(-remove)
+  binarydf <- binarydf %>% dplyr::select(-remove,-remove2)
   return(binarydf)
 }
 
