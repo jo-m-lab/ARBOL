@@ -849,7 +849,7 @@ MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
 #' @export
 bintree_to_df <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
-  binarydf <- data.frame(ToDataFrameTree(node, 'pathString','plotHeight','isLeaf'))
+  binarydf <- data.frame(ToDataFrameTree(bintree, 'pathString','plotHeight','isLeaf'))
   bin2 <- binarydf %>% filter(!isLeaf) %>% mutate(pval = 1-pvclust_tree$edges$au)
   binarydf <- binarydf %>% left_join(bin2)
   colnames(binarydf) <- c('remove','pathString','plotHeight','remove2','pval')
