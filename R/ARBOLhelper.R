@@ -990,8 +990,6 @@ getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 
   markersAsList <- markersAsList %>% dplyr::rename(tierNident=cluster)
 
-  srobj@meta.data$CellID <- row.names(srobj@meta.data)
-
   srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident")
   
   #the following lines will cause the function to give a standard name only for the majority celltype_col per cellstate
