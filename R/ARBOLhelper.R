@@ -7,8 +7,7 @@
 #' txt <- ToNewickPS(divtree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' @export
-#' Functions for data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. 
-#' This is useful when node names are redundant throughout a tree, which happens in binary tree calculation with pvclust
+#' Functions for data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. This is useful when node names are redundant throughout a tree, which happens in binary tree calculation with pvclust
 
 ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
 
@@ -59,12 +58,12 @@ as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
 #data.tree.Node to ape tree object conversion with internal nodes named by pathString and leaf nodes named without pathString (only endname)
 as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
   result = as.phylo.Node(x)
-  result$node.label <- preppedTree_toDF(x,'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
+  result$node.label <- allotedTreeToDF(x,'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
   return(result)
 }
 
 
-#' data.tree to ggraph object conversion with custom Node->dendrogram function that uses pathString as node names. 
+#' data.tree to ggraph object conversion with custom Node -> dend object conversion function that uses pathString as node names. 
 #' @param object A data tree object
 #' @param heightAttribute plot height attribute. Default is plotHeight
 #' @return dendrogram object
@@ -72,8 +71,7 @@ as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
 #' txt <- ToNewickPS(divtree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' @export
-#' Functions for data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. 
-#' This is useful when node names are redundant throughout a tree, which happens in binary tree calculation with pvclust
+#' Functions for data.tree to dendrogram object conversion using Node pathString as node names. This is useful when node names are redundant throughout a tree, which happens in taxonomy calculation with pvclust
 
 as.dendrogram.NodePS <- function(object, heightAttribute = 'plotHeight', edgetext = FALSE,
                                namefield = 'pathString', ...) {
@@ -121,16 +119,14 @@ as.dendrogram.NodePS <- function(object, heightAttribute = 'plotHeight', edgetex
 #' @export
 LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
     tierfiles <- list.files(folder,full.names=TRUE,recursive=TRUE)
-    tsvlist <- list()
     sample_strings <- sub('\\..*$','',basename(tierfiles))
     sample_strings <- sub('_T0C0_', '',sample_strings)
     tiers <- map2(tierfiles, sample_strings, ~fread(.x,header=FALSE) %>% mutate(id = .y))
     tiers <- rbindlist(tiers) %>% data.frame
     tiers$id <- gsub('_','.',tiers$id)
     tiers <- tiers %>% separate(id,into=paste0('tier',1:maxtiers),sep='\\.',remove=FALSE)
-    #lapply(3:maxtiers+2,function(x){cols<-colnames(tiers[,3:x]);print(cols)})
-    tiers <- tiers %>% rename(CellID=V1)
-    tiers <- tiers %>% data.frame %>% rename(tierNident=id)
+    tiers <- tiers %>% dplyr::rename(CellID=V1)
+    tiers <- tiers %>% data.frame %>% dplyr::rename(tierNident=id)
     return(tiers)
 }
 
@@ -142,12 +138,12 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return dataframe with species and diversity columns
 #' @examples
-#' dataframe <- dataframe %>% left_join(DiversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
+#' dataframe <- dataframe %>% left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
 #'                            suppressMessages
-#' metadata <- metadata %>% left_join(DiversityPerGroup(metadata, species=tierNident, group='sample')) %>% 
+#' metadata <- metadata %>% left_join(diversityPerGroup(metadata, species=tierNident, group='sample')) %>% 
 #'                          suppressMessages
 #' @export
-DiversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') {
+diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') {
   #enquo parameters to allow dplyr calls
     divcols <- enquo(species)
     #count groups per species
@@ -211,9 +207,9 @@ SIperIDs <- function(df, group, diversity_metric = 'simpson') {
 #' Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()
 #' @return a metadata dataframe ready for tree building
 #' @examples
-#' prepARBOLmeta_tree(srobj, maxtiers=10)
+#' prepSubclusteringMetadata(srobj, maxtiers=10)
 #' @export
-prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes,numerical_attributes) {
+prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes,numerical_attributes) {
     meta <- srobj@meta.data
 
     meta <- spread_tierN(meta,max_tiers=maxtiers)
@@ -249,7 +245,7 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 }
 
 #' Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it
-#' calls prepARBOLmeta_tree() and propagate_tree()
+#' calls prepSubclusteringMetadata() and propagateTree()
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', and 'sample' columns. 
 #' @param categories columns in metadata for which you want to track categories present per node. Also finds the majority per node
 #' @param diversities columns in metadata for which you want to calculate diversity per node 
@@ -258,9 +254,9 @@ prepARBOLmeta_tree <- function(srobj,maxtiers=10,categorical_attributes,diversit
 #' @return the input seurat object with tiered clustering tree in srobj@@misc$ARBOLclustertree, 
 #' plot of tree to srobj@@misc$ARBOLclustertreeviz, and ggraph object to srobj@@misc$ARBOLclustertreeggraph
 #' @examples
-#' srobj <- sr_ARBOLclustertree(srobj)
+#' srobj <- subclusteringTree(srobj)
 #' @export
-sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = 'sample') {
+subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = 'sample') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -276,20 +272,20 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
   srobj <- suppressMessages(tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric))
   
-  treemeta <- suppressMessages(prepARBOLmeta_tree(srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = counts))
+  treemeta <- suppressMessages(prepSubclusteringMetadata(srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = counts))
 
   ARBOLtree <- suppressMessages(as.Node(treemeta))
 
-  Atree <- suppressMessages(propagate_tree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts))
+  Atree <- suppressMessages(propagateTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts))
 
   #obtain counts columns from propagated data tree
   attrs <- Atree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
 
-  ARBOLdf <- do.call(preppedTree_toDF, c(Atree,'n','pathString', categories, paste0(categories,'_majority'), paste0(diversities,'_diversity'),count_cols))
+  ARBOLdf <- do.call(allotedTreeToDF, c(Atree,'n','pathString', categories, paste0(categories,'_majority'), paste0(diversities,'_diversity'),count_cols))
 
   #simple code call of translation to df disallowing custom diversity_attributes
-  #ARBOLdf <- preppedTree_toDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
+  #ARBOLdf <- allotedTreeToDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
 
   ARBOLphylo <- as.phylo(ARBOLtree)
   #for original ARBOL clustering tree, set all edge lengths to 1
@@ -315,22 +311,22 @@ sr_ARBOLclustertree <- function(srobj, categories = 'sample', diversities = 'sam
 
 
 #' Propagate attributes up a data.tree object to enable manipulation and visualization of all nodes
-#' Automatically run when building trees using sr_ARBOLclustertree or sr_ARBOLbinarytree
+#' Automatically run when building trees using subclusteringTree or ARBOLcentroidTaxonomy
 #' @param srobj a seurat object with ARBOL 'tierNident' and 'sample' columns
 #' @param ARBOLtree data.tree object
 #' @param numerical_attributes numerical attributes are propagated up a tree as counts of each unique value per node.
 #' creates a new column per unique value per attribute. counts are added as node$attribute_n_value
-#' @param categorical_attributes categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
-#' majority added as node$attribute_majority
+#' @param categorical_attributes categorical attributes are propagated up a tree as unique values per node. 
+#' also calculates a majority per node - majority added as node$attribute_majority
 #' @param diversity_attributes attributes for which to calculate diversity in each node. 
 #' Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' added as node$attribute_diversity
 #' @return data.tree object with attributes propagated to all nodes
 #' @examples
-#' arbolTree <- propagate_tree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
+#' arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
 #' @export
-propagate_tree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample', diversity_metric = 'simpson') {
+propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample', diversity_metric = 'simpson') {
 
     #calculate number of children per node
     ARBOLtree$Do(function(node) node$numChildren <- node$children %>% length)
@@ -397,16 +393,16 @@ propagate_tree <- function(ARBOLtree, srobj, numerical_attributes = NA, categori
 #' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to getCentroids
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return only pvclust object
 #' @export
-binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
+centroidTaxonomy_noSeurat <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), nboot = 1) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
-      centroids <- get_centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+      centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=nboot)
@@ -431,20 +427,20 @@ binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'com
 #' @param centroid_method the function used to calculate centroids in the tree_reduction matrix, as implemented in Matrix.utils::aggregate.Matrix(fun)
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
-#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to get_centroids
+#' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to getCentroids
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
-#' srobj <- sr_binarytree(srobj = srobj, tree_reduction = 'pca', hclust_method = 'complete',
+#' srobj <- centroidTaxonomy(srobj = srobj, tree_reduction = 'pca', hclust_method = 'complete',
 #'                          distance_method = 'euclidean', centroid_method = 'median', 
 #'                          centroid_assay = 'SCT', reduction_dims = 1:25)
 #' @export
-sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
+centroidTaxonomy <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), nboot = 1) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
-      centroids <- get_centroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+      centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=nboot)
@@ -472,7 +468,7 @@ sr_binarytree <- function(srobj, tree_reduction = 'centroids', hclust_method = '
 #' @examples
 
 #' @export
-get_centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {
 
     srobj_meta <- srobj@meta.data
@@ -513,7 +509,7 @@ get_centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 }
 
 #' Creates binary tree object for ARBOL run, adds it to seurat object along with a graph of it
-#' calls sr_binarytree() in which assay + methods for tree building are called
+#' calls centroidTaxonomy() in which assay + methods for tree building are called
 #' Also adds metrics used in building tree to seurat object in case needed for downstream applications
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
 #' @param categories categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
@@ -533,9 +529,9 @@ get_centroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduct
 #' @param nboot number of bootstraps for pvclust() function. defaults to 1 for speed
 #' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
 #' @examples
-#' srobj <- sr_ARBOLbinarytree(srobj, categories = c('celltype','disease'))
+#' srobj <- ARBOLcentroidTaxonomy(srobj, categories = c('celltype','disease'))
 #' @export
-sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'sample', 
+ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 'sample', 
                                 diversity_metric = 'simpson', counts = 'sample',
                                 tree_reduction = 'centroids', hclust_method = 'complete',
                                 distance_method = 'euclidean', centroid_method = 'mean', 
@@ -559,16 +555,16 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
     counts = c('sample',counts)
   }
   
-  srobj <- sr_binarytree(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
+  srobj <- centroidTaxonomy(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
                           distance_method = distance_method, centroid_method = centroid_method, 
                           centroid_assay = centroid_assay, gene_list = gene_list, reduction_dims = reduction_dims, nboot = nboot)
 
-  binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
+  binarydf <- binaryTreeToDF(pvclust_tree=srobj@misc$pvclust)
 
-  divtree <- tree_allotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
+  divtree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
                                 diversity_metric = diversity_metric, counts = counts)
 
-  divtree <- propagate_tree(divtree,srobj=srobj, categorical_attributes = categories, 
+  divtree <- propagateTree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts)
 
   x <- data.tree_to_ggraph(divtree, categories, diversities, counts)
@@ -580,8 +576,8 @@ sr_ARBOLbinarytree <- function(srobj, categories = 'sample', diversities = 'samp
   bt1 <- ggraph(x, layout = 'dendrogram', height=plotHeight*10) +
     geom_edge_elbow() + 
     geom_node_point(size=0) + 
-    geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=1.01,angle=90) + 
-    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=1.01,size=3,angle=90) +
+    geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=0,angle=270) + 
+    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=0,size=3,angle=270) +
     theme_void() +
     geom_node_point(aes(filter = leaf,color=sample_diversity),size=4,shape='square') + 
     scale_color_gradient(low='grey90',high='grey10',limits=c(0,1)) +
@@ -635,7 +631,7 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   apeTree <- ape::read.tree(text=txt)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
   treeDF <- treeDF %>% select(name=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- tidygraph::as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
@@ -655,7 +651,7 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heig
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(preppedTree_toDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
   treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
@@ -663,15 +659,15 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heig
 }
 
 #' Allots seurat object metadata attributes to a data.tree object
-#' Once attributes are alloted, propagate_tree should be run to propagate attributes up the tree.
+#' Once attributes are alloted, propagateTree should be run to propagate attributes up the tree.
 #' @param srobj a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns. 
 #' @param categories categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
 #' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
-#' @return
-#' @export
-tree_allotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts) {
+#' @return tree with attributes alloted to internal nodes
+#' @export 
+treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts) {
   srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
 
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
@@ -707,18 +703,20 @@ tree_allotment <- function(srobj, treedf, categories, diversities, diversity_met
 
 }
 
-#' Merges tierNidents with their nearest neighbors in a binary tree if their sample diversity and number of cells do not meet thresholds
+#' Merges tierNidents with their nearest neighbors in a binary tree if 
+#' their sample diversity and number of cells do not meet specified thresholds.
 #' Directly prunes srobj-attached binary tree. 
-#' We suggest re-calculating tree (or just ggraph for viz) from here using sr_binarytree() or remake_ggraph(), 
+#' We suggest re-calculating tree (or just ggraph for viz) from here using centroidTaxonomy() or remake_ggraph(), 
 #' so that new endclusters are treated as leaf nodes
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, 
+#' typically calculated using ARBOLcentroidTaxonomy
 #' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
 #' @param size_threshold cluster size below which to prune nodes from tree
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
 #' @examples
-#' srobj <- MergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
+#' srobj <- mergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
 #' @export
-MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
+mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 
   srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
@@ -728,7 +726,7 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
   Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
+  divtestdf <- allotedTreeToDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
   divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
@@ -742,14 +740,14 @@ MergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 }
 
 #' Merge based on sample diversity and endclust size, only outputting new end-clusters per cell
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy
 #' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
 #' @param size_threshold cluster size below which to prune nodes from tree
 #' @return dataframe with 2 columns, cellid and new endcluster
 #' @examples
-#' srobj <- MergeEndclustsIdents(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
+#' srobj <- mergeEndclustsIdents(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
 #' @export
-MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_threshold) {
+mergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_threshold) {
 
   workingTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
@@ -759,7 +757,7 @@ MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
   Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
+  divtestdf <- allotedTreeToDF(workingTree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
   divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
@@ -771,17 +769,17 @@ MergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 }
 
 #' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds
-#' We suggest re-calculating tree (or just ggraph for viz) from here using sr_binarytree() or remake_ggraph(), 
+#' We suggest re-calculating tree (or just ggraph for viz) from here using centroidTaxonomy() or remake_ggraph(), 
 #' so that new endclusters are treated as leaf nodes
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent 
 #' and a merged data.tree object in srobj@@misc$workingTree
 #' @examples
-#' srobj <- MergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+#' srobj <- mergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
 #' @export
-MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
+mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
  workingTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
@@ -792,7 +790,7 @@ MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
   Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
+  divtestdf <- allotedTreeToDF(workingTree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
   divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
@@ -812,14 +810,14 @@ MergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
 #' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds, 
 #' outputs dataframe of new idents
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using sr_ARBOLbinarytree
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return dataframe of new idents
 #' @examples
-#' mIdents <- MergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+#' mIdents <- mergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
 #' @export
-MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) {
+mergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) {
 
   workingTree <- Clone(srobj@misc$binarytree)
   #DataTree::Prune chops all nodes that don't meet a threshold
@@ -830,7 +828,7 @@ MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
   Prune(workingTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- preppedTree_toDF(workingTree, 'height', "pathString", 'ids')
+  divtestdf <- allotedTreeToDF(workingTree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
   divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
@@ -845,9 +843,9 @@ MergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
 #' @param pvclust_tree a pvclust or hclust tree 
 #' @return a dataframe with one row per node of the tree
 #' @examples
-#' binarydf <- bintree_to_df(pvclust_tree=srobj@@misc$pvclust)
+#' binarydf <- binaryTreeToDF(pvclust_tree=srobj@@misc$pvclust)
 #' @export
-bintree_to_df <- function(pvclust_tree) {
+binaryTreeToDF <- function(pvclust_tree) {
   bintree <- as.Node(as.dendrogram(pvclust_tree$hclust))
   binarydf <- data.frame(ToDataFrameTree(bintree, 'pathString','plotHeight','isLeaf'))
   bin2 <- binarydf %>% filter(!isLeaf) %>% mutate(pval = 1-pvclust_tree$edges$au)
@@ -865,14 +863,14 @@ bintree_to_df <- function(pvclust_tree) {
 #' @param tree usually a custom annotated data.tree object
 #' @return a dataframe of the tree with one row per node
 #' @examples
-#' ARBOLdf <- preppedTree_toDF(divtree)
+#' ARBOLdf <- allotedTreeToDF(divtree)
 #' txt <- ARBOL::ToNewickPS(divtree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' 
 #' x <- as_tbl_graph(ARBOLphylo, directed=T) %>% activate(nodes) %>% 
 #' left_join(ARBOLdf %>% select(name=pathString,sample_diversity,disease_diversity))
 #' @export
-preppedTree_toDF <- function(tree, ...) {
+allotedTreeToDF <- function(tree, ...) {
     ARBOLdf <- ToDataFrameTree(tree, ...)
 
     #remove graphics from levelName column
@@ -899,7 +897,7 @@ tierN_diversity <- function(srobj, diversity_attributes, diversity_metric = 'sim
   srobj@meta.data <- srobj@meta.data %>% dplyr::select(-any_of(paste0(diversity_attributes, '_diversity')))
     for(z in diversity_attributes) {
         #calculate and join new diversity
-        srobj@meta.data <- srobj@meta.data %>% left_join(DiversityPerGroup(srobj@meta.data, species=tierNident, group=z, diversity_metric = diversity_metric)) %>% suppressMessages
+        srobj@meta.data <- srobj@meta.data %>% left_join(diversityPerGroup(srobj@meta.data, species=tierNident, group=z, diversity_metric = diversity_metric)) %>% suppressMessages
     }
     return(srobj)
 }
@@ -933,7 +931,8 @@ spread_tierN <- function(df, max_tiers = 10) {
 }
 
 #' Calculate curated names for set of clusters as function of their major type
-#' @param srobj a seurat object with a celltype metadata column, specified in celltype_col, and tierNident i.e. srobj@@meta.data$tierNident
+#' @param srobj a seurat object with a celltype metadata column, specified in celltype_col, 
+#' CellID (for preserving metadata rownames), and tierNident (i.e. srobj@@meta.data$CellID, srobj@@meta.data$tierNident)
 #' @param figdir the figdir from an GenTieredClusters (ARBOL) run 
 #' @param max_cells_per_ident maximum cells to use in FindAllMarkers call. defaults to 200
 #' @param celltype_col the metadata column corresponding to celltype to assign standard names
@@ -941,59 +940,73 @@ spread_tierN <- function(df, max_tiers = 10) {
 #' @param n_genes number of genes with which to create standard names. defaults to 2
 #' @return the seurat object with curatedname column in metadata
 #' @examples
-#' srobj <- GetStandardNames(srobj,figdir='ARBOLoutput/figs')
+#' srobj <- getStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
-GetStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col = 'celltype',standardname_col = 'curatedname',n_genes = 2) {
+getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col = 'celltype',standardname_col = 'curatedname',n_genes = 2) {
+
+  if (!is.element('CellID',colnames(srobj@meta.data))) {
+    message('you are missing the CellID column - function will fail with confusing error message')
+  }
+  if (!is.element('tierNident',colnames(srobj@meta.data))) {
+    message('you are missing the tierNident column - function will fail with confusing error message')
+  }
 
   Idents(srobj) <- srobj@meta.data[[celltype_col]]
   typeobjs <- SplitSrobjOnMeta(srobj, meta=celltype_col,'typeobjects')
 
   if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
-    CuratedtypeAmongType1markers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
+    cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
           tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
            return(tmp)})
-    write.table(rbindlist(CuratedtypeAmongType1markers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
+    write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
   }
   else {
-    CuratedtypeAmongType1markers <- fread(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) %>%
+    cellStateMarkers <- fread(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) %>%
                     split(f=.$cluster)
   }
   
-  t <- lapply(CuratedtypeAmongType1markers,function(listmarkers) {
+   markersL <- lapply(cellStateMarkers,function(cellStateDF) {
     tryCatch({
-           fccol <- grep("FC",colnames(listmarkers))
-            biomarkers <- listmarkers %>%
-          mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(listmarkers[,!!fccol], as.numeric) * (pct.1 / (pct.2 + 1e-300))) %>%
-                    group_by(cluster) %>% top_n(n_genes, wt=rnkscr) %>% 
+           fccol <- grep("FC",colnames(cellStateDF))
+            biomarkers <- cellStateDF %>%
+          mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(cellStateDF[,!!fccol], as.numeric) * (pct.1 / (pct.2 + 1e-300))) %>%
+                    group_by(cluster) %>% dplyr::slice_max(n=n_genes, order_by=rnkscr, with_ties=F) %>% 
                     arrange(cluster, desc(rnkscr));
 
-            endname <- biomarkers %>% summarize(markers = paste(gene, collapse="."))
+              endname <- biomarkers %>% dplyr::summarize(markers = paste(gene, collapse="."))
 
-              endname <- endname %>% select(cluster,markers)
+              endname <- endname %>% dplyr::select(cluster,markers)
               return(endname)
                  },
-           error = function(e) {
-                       #print(unique(listmarkers$cluster));
-                       #endname = data.frame(cluster=unique(listmarkers$cluster))
-                       #endname$markers <- NA
-                               #return(endname)
-                                     })
+           error = function(e) { #message(sprintf('standard name calculation failed for a cluster... reason: ',e)) 
+           })
                })
 
-  suppressWarnings( bind_rows(t,.id='subtype_id') -> markersAsList)
+  suppressWarnings( bind_rows(markersL,.id='subtype_id') -> markersAsList)
 
-  message('number of end clusters for which at least two biomarkers were found: ',
+  message(sprintf('number of end clusters for which at least %s biomarkers were found: ',n_genes),
        length(markersAsList$cluster))
   message('total number of end clusters: ',length(unique(srobj@meta.data$tierNident)))
 
-  markersAsList <- markersAsList %>% rename(tierNident=cluster)
+  markersAsList <- markersAsList %>% dplyr::rename(tierNident=cluster)
 
   srobj@meta.data$CellID <- row.names(srobj@meta.data)
 
   srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident")
-  srobj@meta.data[[standardname_col]] <- paste(srobj@meta.data[[celltype_col]],srobj@meta.data$markers,sep='.')
+  
+  #the following lines will cause the function to give a standard name only for the majority celltype_col per cellstate
+  majority <- srobj@meta.data %>% dplyr::count(tierNident,across(celltype_col),markers) %>% group_by(tierNident) %>% 
+                             slice_max(n) %>% dplyr::select(-n)
 
+  colnames(majority) <-  c('tierNident',paste0('majority_',celltype_col),'markers')
+  majority <- majority %>% unite({{standardname_col}},-tierNident,sep='.')
 
+  srobj@meta.data <- srobj@meta.data %>% left_join(majority)
+
+  #Hoping to include an if-statement around the previous block to enable users to 
+  #allow or disallow multiple standard names per cellstate
+
+  #replace rownames of seurat object metadata
   row.names(srobj@meta.data) <- srobj@meta.data$CellID
 
   return(srobj)
@@ -1023,7 +1036,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
     counts = c('sample',counts)
   } 
 
-  binarydf <- bintree_to_df(pvclust_tree=srobj@misc$pvclust)
+  binarydf <- binaryTreeToDF(pvclust_tree=srobj@misc$pvclust)
 
   srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
 
@@ -1056,7 +1069,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   divtree <- as.Node(finaltreedf)
 
-  divtree <- propagate_tree(divtree,srobj=srobj, categorical_attributes = categories, 
+  divtree <- propagateTree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts)
 
   srobj@misc$binarytreeggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts)

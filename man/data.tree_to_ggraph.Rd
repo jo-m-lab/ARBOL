@@ -2,26 +2,32 @@
 % Please edit documentation in R/ARBOLhelper.R
 \name{data.tree_to_ggraph}
 \alias{data.tree_to_ggraph}
-\title{data.tree to ggraph conversion, by converting data.tree structure (doesn't carry annotations) to ggraph, 
-then join data frame of data.tree
+\title{data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
+then ape (still doesn't carry annotations) to ggraph, 
+then join data frame of data.tree to restore annotations.
 requires 'n' and 'pathString' annotations in data.tree
 Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
-1) write data.tree object to Newick using custom Newick function,
-2) read Newick into ape tree object
-3) ggraph::as_tbl_graph to convert from ape to ggraph
-4) data.tree to node-level dataframe 
-5) join node-level dataframe to tbl_graph nodes}
+1) write data.tree object to dend object using custom as.dendrogram.Node function,
+2) convert dendrogram structure object to ggraph using tidygraph::as_tbl_graph
+3) left join heights, categories, diversities, and counts to tbl_graph object
+previous version data.tree_to_ggraphNW used highly inefficient newick text conversion for tree structure}
 \usage{
-data.tree_to_ggraph(data.tree, categories, diversities, counts)
+data.tree_to_ggraph(
+  data.tree,
+  categories,
+  diversities,
+  counts,
+  heightAttribute = "plotHeight"
+)
 }
 \description{
-data.tree to ggraph conversion, by converting data.tree structure (doesn't carry annotations) to ggraph, 
-then join data frame of data.tree
+data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
+then ape (still doesn't carry annotations) to ggraph, 
+then join data frame of data.tree to restore annotations.
 requires 'n' and 'pathString' annotations in data.tree
 Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
-1) write data.tree object to Newick using custom Newick function,
-2) read Newick into ape tree object
-3) ggraph::as_tbl_graph to convert from ape to ggraph
-4) data.tree to node-level dataframe 
-5) join node-level dataframe to tbl_graph nodes
+1) write data.tree object to dend object using custom as.dendrogram.Node function,
+2) convert dendrogram structure object to ggraph using tidygraph::as_tbl_graph
+3) left join heights, categories, diversities, and counts to tbl_graph object
+previous version data.tree_to_ggraphNW used highly inefficient newick text conversion for tree structure
 }

@@ -20,6 +20,10 @@ GenTieredClusters(
   max_tiers = 10,
   EnoughDiffUp = 5,
   EnoughDiffDown = 5,
+  res_scan_step = 5,
+  res_scan_min = 0.01,
+  res_scan_max = 3,
+  res_scan_n = 40,
   tierAllowedRecomb = 0,
   harmony_var = NULL,
   DownsampleNum = 7500
@@ -53,6 +57,14 @@ GenTieredClusters(
 \item{EnoughDiffUp}{minimum number of up-regulated genes to call clusters unique. Differential expression is performed when clustering finds 2 clusters. defaults to 5}
 
 \item{EnoughDiffDown}{minimum number of down-regulated genes. If either up or down is not met, the 2 clusters are joined, and further clustering is stopped. defaults to 5}
+
+\item{res_scan_step}{number of resolutions of decreasing score before an early silhouette analysis resolution scan stop}
+
+\item{res_scan_min}{the smallest resolution to scan}
+
+\item{res_scan_max}{the highest resolution to scan (default is 3 due to legacy, we recommend lowering this)}
+
+\item{res_scan_n}{the number of resolutions to scan. A logarithmic sequence of numbers between min and max are scanned}
 
 \item{tierAllowedRecomb}{minimum tier where differential expression can be called to decide on recombination. defaults to 0. clustering may stop early when clustering finds 2 clusters with high cell numbers, as Wilcoxon effect sizes may be low.}
 

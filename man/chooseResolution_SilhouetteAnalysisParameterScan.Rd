@@ -9,9 +9,10 @@ chooseResolution_SilhouetteAnalysisParameterScan(
   assay = cluster_assay,
   n.pcs = input.srobj@misc$nPCs,
   sample.name = format(Sys.time(), "\%a-\%b-\%d-\%X-\%Y-\%Z"),
-  res.low = 0.01,
-  res.high = 3,
-  res.n = 40,
+  res.low = res.low,
+  res.high = res.high,
+  res.n = res.n,
+  res.step = res.step,
   bias = "under",
   figdir = NULL
 )
@@ -30,6 +31,8 @@ chooseResolution_SilhouetteAnalysisParameterScan(
 \item{res.high}{highest resolution}
 
 \item{res.n}{number of resolutions to test}
+
+\item{res.step}{number of resolution steps before testing for local maximum. used to reduce runtime.}
 
 \item{bias}{bias toward resolution choice, when resolution results are similar}
 
