@@ -957,6 +957,7 @@ getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
   if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
           tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+          tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
            return(tmp)})
     write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
   }
@@ -976,13 +977,14 @@ getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
               endname <- biomarkers %>% dplyr::summarize(markers = paste(gene, collapse="."))
 
               endname <- endname %>% dplyr::select(cluster,markers)
+              endname[[celltype_col]] <- unique(cellStateDF[[celltype_col]])
               return(endname)
                  },
            error = function(e) { #message(sprintf('standard name calculation failed for a cluster... reason: ',e)) 
            })
                })
 
-  suppressWarnings( bind_rows(markersL,.id='subtype_id') -> markersAsList)
+  suppressWarnings( bind_rows(markersL) -> markersAsList)
 
   message(sprintf('number of end clusters for which at least %s biomarkers were found: ',n_genes),
        length(markersAsList$cluster))
