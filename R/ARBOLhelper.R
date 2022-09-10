@@ -1000,7 +1000,7 @@ getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
   majority <- majority %>% unite({{standardname_col}},-tierNident,sep='.')
 
   #remove duplicate lines per cellID
-  srobj@meta.data <- srobj@meta.data %>% dplyr::select(-markers)
+  srobj@meta.data <- srobj@meta.data %>% dplyr::select(-markers) %>% distinct
 
   srobj@meta.data <- srobj@meta.data %>% left_join(majority)
 
