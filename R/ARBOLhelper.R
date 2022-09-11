@@ -708,7 +708,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 #' Directly prunes srobj-attached binary tree. 
 #' We suggest re-calculating tree (or just ggraph for viz) from here using centroidTaxonomy() or remake_ggraph(), 
 #' so that new endclusters are treated as leaf nodes
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, 
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, 
 #' typically calculated using ARBOLcentroidTaxonomy
 #' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
 #' @param size_threshold cluster size below which to prune nodes from tree
@@ -718,15 +718,15 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 #' @export
 mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 
-  srobj@misc$rawBinaryTree <- Clone(srobj@misc$binarytree)
+  srobj@misc$rawTaxTree <- Clone(srobj@misc$taxTree)
   #DataTree::Prune chops all nodes that don't meet a threshold
-  Prune(srobj@misc$binarytree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
-  Prune(srobj@misc$binarytree, pruneFun = function(x) x$n > size_threshold)
+  Prune(srobj@misc$taxTree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
+  Prune(srobj@misc$taxTree, pruneFun = function(x) x$n > size_threshold)
 
   #remove unnecessary nodes that have only 1 child - these are created in binary tree threshold merging
-  Prune(srobj@misc$binarytree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
+  Prune(srobj@misc$taxTree, pruneFun = function(x) any(x$children %>% length > 1 || x$children %>% length == 0))
 
-  divtestdf <- allotedTreeToDF(srobj@misc$binarytree, 'height', "pathString", 'ids')
+  divtestdf <- allotedTreeToDF(srobj@misc$taxTree, 'height', "pathString", 'ids')
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
   divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
@@ -740,7 +740,7 @@ mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 }
 
 #' Merge based on sample diversity and endclust size, only outputting new end-clusters per cell
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
 #' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
 #' @param size_threshold cluster size below which to prune nodes from tree
 #' @return dataframe with 2 columns, cellid and new endcluster
@@ -749,7 +749,7 @@ mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 #' @export
 mergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_threshold) {
 
-  workingTree <- Clone(srobj@misc$binarytree)
+  workingTree <- Clone(srobj@misc$taxTree)
   #DataTree::Prune chops all nodes that don't meet a threshold
   Prune(workingTree, pruneFun = function(x) x$sample_diversity > sample_diversity_threshold)
   Prune(workingTree, pruneFun = function(x) x$n > size_threshold)
@@ -771,7 +771,7 @@ mergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 #' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds
 #' We suggest re-calculating tree (or just ggraph for viz) from here using centroidTaxonomy() or remake_ggraph(), 
 #' so that new endclusters are treated as leaf nodes
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent 
@@ -781,7 +781,7 @@ mergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 #' @export
 mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
- workingTree <- Clone(srobj@misc$binarytree)
+ workingTree <- Clone(srobj@misc$taxTree)
   #DataTree::Prune chops all nodes that don't meet a threshold
   for (z in seq(1,length(threshold_attributes))) {
     Prune(workingTree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
@@ -810,7 +810,7 @@ mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
 #' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds, 
 #' outputs dataframe of new idents
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy
+#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return dataframe of new idents
@@ -819,7 +819,7 @@ mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 #' @export
 mergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) {
 
-  workingTree <- Clone(srobj@misc$binarytree)
+  workingTree <- Clone(srobj@misc$taxTree)
   #DataTree::Prune chops all nodes that don't meet a threshold
   for (z in seq(1,length(threshold_attributes))) {
     Prune(workingTree, pruneFun = function(x) x[[threshold_attributes[z]]] > thresholds[z])
