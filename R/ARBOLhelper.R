@@ -986,13 +986,13 @@ getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 
   suppressWarnings( bind_rows(markersL) -> markersAsList)
 
-  message(sprintf('number of end clusters for which at least %s biomarkers were found: ',n_genes),
+  message(sprintf('number of tierNident-celltype pairs for which at least %s biomarkers were found: ',n_genes),
        length(markersAsList$cluster))
   message('total number of end clusters: ',length(unique(srobj@meta.data$tierNident)))
 
   markersAsList <- markersAsList %>% dplyr::rename(tierNident=cluster)
 
-  srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by="tierNident")
+  srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by=c("tierNident",celltype_col))
   
   #the following lines will cause the function to give a standard name only for the majority celltype_col per cellstate
   majority <- srobj@meta.data %>% dplyr::count(tierNident,across(celltype_col),markers) %>% group_by(tierNident) %>% 
