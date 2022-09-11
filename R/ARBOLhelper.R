@@ -251,8 +251,8 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 #' @param diversities columns in metadata for which you want to calculate diversity per node 
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts columns in metadata for which you want to count each value per node
-#' @return the input seurat object with tiered clustering tree in srobj@@misc$ARBOLclustertree, 
-#' plot of tree to srobj@@misc$ARBOLclustertreeviz, and ggraph object to srobj@@misc$ARBOLclustertreeggraph
+#' @return the input seurat object with tiered clustering tree in srobj@@misc$subclusteringTree, 
+#' plot of tree to srobj@@misc$subclusteringViz, and ggraph object to srobj@@misc$cluster_ggraph
 #' @examples
 #' srobj <- subclusteringTree(srobj)
 #' @export
@@ -302,9 +302,9 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
   bt0 <- ggraph(x, layout = 'tree', circular=T) + 
   geom_edge_diagonal() + geom_node_point(size=0.3) + theme_classic()
 
-  srobj@misc$ARBOLclustertree <- Atree
-  srobj@misc$ARBOLclustertreeviz <- bt0
-  srobj@misc$ARBOLclustertreeggraph <- x
+  srobj@misc$subclusteringTree <- Atree
+  srobj@misc$subclusteringViz <- bt0
+  srobj@misc$cluster_ggraph <- x
 
   return(srobj)
 }
@@ -583,11 +583,11 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
     scale_color_gradient(low='grey90',high='grey10',limits=c(0,1)) +
     expand_limits(y=-5)
 
-  srobj@misc$binarytreeviz <- bt1
+  srobj@misc$taxViz <- bt1
 
-  srobj@misc$binarytree <- divtree
+  srobj@misc$taxTree <- divtree
   
-  srobj@misc$binarytreeggraph <- x
+  srobj@misc$tax_ggraph <- x
 
   #add metrics used for tree creation to seurat object
   srobj@misc$tree_metrics[['diversities']] <- diversities
@@ -1021,7 +1021,7 @@ getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col =
 #' @param diversities diversities as in tree building functions
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
-#' @return the seurat object with ggraph object remade in srobj@@misc$binarytreeggraph
+#' @return the seurat object with ggraph object remade in srobj@@misc$tax_ggraph
 #' @examples
 #' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), diversities = c('curatedname','celltype'))
 #' @export
@@ -1075,7 +1075,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
   divtree <- propagateTree(divtree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts)
 
-  srobj@misc$binarytreeggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts)
+  srobj@misc$tax_ggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts)
 
   return(srobj)
 
