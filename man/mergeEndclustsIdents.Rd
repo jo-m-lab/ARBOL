@@ -7,7 +7,7 @@
 mergeEndclustsIdents(srobj, sample_diversity_threshold, size_threshold)
 }
 \arguments{
-\item{srobj}{a seurat object with a binarytree calculated in slot srobj@misc$binarytree, typically calculated using ARBOLcentroidTaxonomy}
+\item{srobj}{a seurat object with a binarytree calculated in slot srobj@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy}
 
 \item{sample_diversity_threshold}{sample diversity below which to prune nodes from tree}
 

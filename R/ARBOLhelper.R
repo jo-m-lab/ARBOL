@@ -942,7 +942,8 @@ spread_tierN <- function(df, max_tiers = 10) {
 #' @examples
 #' srobj <- getStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
-getStandardNames <- function(srobj,figdir,max_cells_per_ident=200,celltype_col = 'celltype',standardname_col = 'curatedname',n_genes = 2) {
+getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_col = 'celltype', 
+                              standardname_col = 'curatedname', n_genes = 2) {
 
   if (!is.element('CellID',colnames(srobj@meta.data))) {
     message('you are missing the CellID column - function will fail with confusing error message')

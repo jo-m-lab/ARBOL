@@ -25,8 +25,8 @@ subclusteringTree(
 \item{counts}{columns in metadata for which you want to count each value per node}
 }
 \value{
-the input seurat object with tiered clustering tree in srobj@misc$ARBOLclustertree, 
-plot of tree to srobj@misc$ARBOLclustertreeviz, and ggraph object to srobj@misc$ARBOLclustertreeggraph
+the input seurat object with tiered clustering tree in srobj@misc$subclusteringTree, 
+plot of tree to srobj@misc$subclusteringViz, and ggraph object to srobj@misc$cluster_ggraph
 }
 \description{
 Creates data tree object for ARBOL run, adds it to seurat object along with a graph of it

@@ -73,7 +73,7 @@ ARBOL(
 \item{saveEndNamesDir}{where to save directory of end clusters, if null does not save}
 }
 \value{
-list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
+dataframe with tierN cluster membership per cell
 }
 \description{
 Performs ARBOL tiered hierarchical clustering on a seurat object. Outputs a dataframe of tier membership per cell

@@ -24,7 +24,7 @@ remake_ggraph(
 \item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 }
 \value{
-the seurat object with ggraph object remade in srobj@misc$binarytreeggraph
+the seurat object with ggraph object remade in srobj@misc$tax_ggraph
 }
 \description{
 remake ggraph object with new categories and diversities, useful to add curatednames

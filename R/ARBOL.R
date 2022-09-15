@@ -680,7 +680,6 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
             break
         }
      }
-    
   }
 
  
@@ -705,35 +704,38 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
   
   if (!is.null(figdir)) {
 
-    print(paste0("Ouptutting summary statistics and returning seurat object... ",
-                 "This will create a pdf in your output directory,",
-                 " and will return your input seurat object amended with the best choice",
-                 " for clusters (found as Best.Clusters in the meta.data matrix, and set to your new ident)..."))
-    
-    pdf(paste(figdir, "/", sample.name, ".pdf", sep=""),
-        width=10, height=4, useDingbats=FALSE)
-    par(mfrow=c(1,3))
-    # Resolution vs # of Clusters
-    plot(set.res, n.clusters, col="black", pch=19,
-         type="p", xlab="Resolution", ylab="# Clusters",
-         main="Resolution vs. # Clusters")
-    
-    # Resolution vs Average Silhouette
-    plot(set.res, sil.average, col="black", pch=19,
-         type="p", xlab="Resolution", ylab="Average Silhouette",
-         main="Resolution vs. Average Silhouette")
-    points(set.res, sil.medians, col="red", pch=15)
-    abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
-    abline(v=resolution.choice, col="dodgerblue2", lty=2)
-    
-    # N Clusters vs Average Silhouette
-    plot(n.clusters, sil.average, col="black", pch=19,
-         type="p", xlab="# Clusters", ylab="Average Silhouette",
-         main="# Clusters vs. Average Silhouette")
-    points(n.clusters, sil.medians, col="red", pch=15)
-    abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
-    abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
-    dev.off()
+    tryCatch({
+          print(paste0("Ouptutting summary statistics and returning seurat object... ",
+                       "This will create a pdf in your output directory,",
+                       " and will return your input seurat object amended with the best choice",
+                       " for clusters (found as Best.Clusters in the meta.data matrix, and set to your new ident)..."))
+          
+          pdf(paste(figdir, "/", sample.name, ".pdf", sep=""),
+              width=10, height=4, useDingbats=FALSE)
+          par(mfrow=c(1,3))
+          # Resolution vs # of Clusters
+          plot(set.res, n.clusters, col="black", pch=19,
+               type="p", xlab="Resolution", ylab="# Clusters",
+               main="Resolution vs. # Clusters")
+          
+          # Resolution vs Average Silhouette
+          plot(set.res, sil.average, col="black", pch=19,
+               type="p", xlab="Resolution", ylab="Average Silhouette",
+               main="Resolution vs. Average Silhouette")
+          points(set.res, sil.medians, col="red", pch=15)
+          abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
+          abline(v=resolution.choice, col="dodgerblue2", lty=2)
+          
+          # N Clusters vs Average Silhouette
+          plot(n.clusters, sil.average, col="black", pch=19,
+               type="p", xlab="# Clusters", ylab="Average Silhouette",
+               main="# Clusters vs. Average Silhouette")
+          points(n.clusters, sil.medians, col="red", pch=15)
+          abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
+          abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
+          dev.off()
+
+        }, error = function(e) {message('silhouette analysis plots failed. reason:'); print(e)})
   }
   
   ######## step 7: return the original seurat object, with the metadata containing a 
@@ -851,40 +853,43 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
   
   if (!is.null(figdir)) {
         ######## step 3: output plot of how the resolution changes the number of clusters you get
+    tryCatch({
+              for(i in 1:length(n.clusters)){
+                n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
+              }
 
-    for(i in 1:length(n.clusters)){
-      n.clusters[i] = length(table(as.vector(srobj.tmp@meta.data[,paste0(assay, "_snn_res.", names(n.clusters)[i])])))
-    }
+              print(paste0("Ouptutting summary statistics and returning seurat object... ",
+                           "This will create a pdf in your output directory,",
+                           " and will return your input seurat object amended with the best choice",
+                           " for clusters (found as Best.Clusters in the meta.data matrix, and set to your new ident)..."))
+              
+              pdf(paste(figdir, "/", sample.name, ".pdf", sep=""),
+                  width=10, height=4, useDingbats=FALSE)
+              par(mfrow=c(1,3))
+              # Resolution vs # of Clusters
+              plot(set.res, n.clusters, col="black", pch=19,
+                   type="p", xlab="Resolution", ylab="# Clusters",
+                   main="Resolution vs. # Clusters")
+              
+              # Resolution vs Average Silhouette
+              plot(set.res, sil.average, col="black", pch=19,
+                   type="p", xlab="Resolution", ylab="Average Silhouette",
+                   main="Resolution vs. Average Silhouette")
+              points(set.res, sil.medians, col="red", pch=15)
+              abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
+              abline(v=resolution.choice, col="dodgerblue2", lty=2)
+              
+              # N Clusters vs Average Silhouette
+              plot(n.clusters, sil.average, col="black", pch=19,
+                   type="p", xlab="# Clusters", ylab="Average Silhouette",
+                   main="# Clusters vs. Average Silhouette")
+              points(n.clusters, sil.medians, col="red", pch=15)
+              abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
+              abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
+              dev.off()
 
-    print(paste0("Ouptutting summary statistics and returning seurat object... ",
-                 "This will create a pdf in your output directory,",
-                 " and will return your input seurat object amended with the best choice",
-                 " for clusters (found as Best.Clusters in the meta.data matrix, and set to your new ident)..."))
-    
-    pdf(paste(figdir, "/", sample.name, ".pdf", sep=""),
-        width=10, height=4, useDingbats=FALSE)
-    par(mfrow=c(1,3))
-    # Resolution vs # of Clusters
-    plot(set.res, n.clusters, col="black", pch=19,
-         type="p", xlab="Resolution", ylab="# Clusters",
-         main="Resolution vs. # Clusters")
-    
-    # Resolution vs Average Silhouette
-    plot(set.res, sil.average, col="black", pch=19,
-         type="p", xlab="Resolution", ylab="Average Silhouette",
-         main="Resolution vs. Average Silhouette")
-    points(set.res, sil.medians, col="red", pch=15)
-    abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
-    abline(v=resolution.choice, col="dodgerblue2", lty=2)
-    
-    # N Clusters vs Average Silhouette
-    plot(n.clusters, sil.average, col="black", pch=19,
-         type="p", xlab="# Clusters", ylab="Average Silhouette",
-         main="# Clusters vs. Average Silhouette")
-    points(n.clusters, sil.medians, col="red", pch=15)
-    abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
-    abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
-    dev.off()
+            }, error = function(e) {message('silhouette analysis plots failed. reason:'); print(e)})
+
   }
   
   ######## step 8: return the original seurat object, with the metadata containing a 
@@ -930,7 +935,7 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
 #' @param saveEndNamesDir where to save directory of end clusters, if null does not save
 #' @param SaveEndFileName prefix for all end cluster files
 #' @param harmony_var variable over which to iterate harmony integration
-#' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
+#' @return dataframe with tierN cluster membership per cell
 #' @export
 
 ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
