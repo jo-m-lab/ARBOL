@@ -338,7 +338,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     ARBOLtree$Do(function(node) node[['n']] <- Aggregate(node, attribute = 'n', aggFun = sum), traversal = "post-order")
 
     #propagate numerical variables up tree by counting occurrences of each variant z of category y in each node
-    if(!is.na(numerical_attributes)) {                     
+    if(is.character(numerical_attributes)) {                     
         for (y in numerical_attributes){
             uniqs <- unique(srobj@meta.data[[y]])
             attrs = sprintf('%s_n_%s',y,uniqs)
@@ -354,7 +354,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
 
     #propagate additional categorical variables
-    if(!is.na(categorical_attributes)) { 
+    if(is.character(categorical_attributes)) { 
         for (y in categorical_attributes) {
             ARBOLtree$Do(function(node) {
               ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
@@ -539,7 +539,7 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
                                 nboot = 1) {
 
 
-  if(is.na(gene_list)) {
+  if (!is.character(gene_list)) {
     gene_list = rownames(srobj[[centroid_assay]]@data)
   } 
 
