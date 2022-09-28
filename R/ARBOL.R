@@ -251,6 +251,17 @@ PreProcess <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun =
   return(srobj)
 }
 
+PreProcess_no_normalization <- function(srobj, ChoosePCs_fun = ChoosePCs_default, ChooseHVG_fun = ChooseHVG_default, fig_dir=NULL, ...) {
+  #' seurat v3 processing
+  srobj <- ChooseHVG_fun(srobj)
+  srobj <- ScaleData(object = srobj, features=VariableFeatures(srobj))
+  srobj <- RunPCA(object = srobj, npcs = min(50, round(ncol(srobj)/2)), verbose=F)
+  nPCs  <- ChoosePCs_fun(srobj, figure_dir=fig_dir)
+  srobj@misc$nPCs <- nPCs
+  message(paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs "))
+  srobj <- FindNeighbors(object = srobj, dims=nPCs, k.param= ceiling(0.5*sqrt(ncol(srobj))))
+  return(srobj)
+}
 
 PreProcess_sctransform_harmony <- function(srobj, fig_dir=NULL, regressVar = NULL, ...) {
   #' seurat v4 processing
@@ -735,7 +746,7 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
           abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
           dev.off()
 
-        }, error = function(e) {message('silhouette analysis plots failed. reason:'); print(e)})
+        }, error = function(e) {message('silhouette analysis plots failed. reason:'); print(e); dev.off()})
   }
   
   ######## step 7: return the original seurat object, with the metadata containing a 
@@ -888,7 +899,7 @@ chooseResolution_SilhouetteAnalysisParameterScan_harmony <- function(
               abline(v=as.numeric(n.clusters[paste(resolution.choice)]), col="dodgerblue2", lty=2)
               dev.off()
 
-            }, error = function(e) {message('silhouette analysis plots failed. reason:'); print(e)})
+            }, error = function(e) {message('silhouette analysis plots failed. reason:'); print(e); dev.off()})
 
   }
   
