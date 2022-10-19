@@ -293,7 +293,8 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
 
   #convert to tbl_graph object to allow easy plotting with ggraph
   x <- tidygraph::as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
-      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols)))
+      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),
+                                    all_of(paste0(diversities,'_diversity')),all_of(count_cols)))
 
   x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% select(to=i))
 
@@ -316,6 +317,8 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
 #' @param ARBOLtree data.tree object
 #' @param numerical_attributes numerical attributes are propagated up a tree as counts of each unique value per node.
 #' creates a new column per unique value per attribute. counts are added as node$attribute_n_value
+#' @param total_attributes total attributes are numerical attributes that you want to propagate up the tree by summing
+#' the value of each node.
 #' @param categorical_attributes categorical attributes are propagated up a tree as unique values per node. 
 #' also calculates a majority per node - majority added as node$attribute_majority
 #' @param diversity_attributes attributes for which to calculate diversity in each node. 
@@ -326,7 +329,8 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
 #' @examples
 #' arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
 #' @export
-propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, diversity_attributes = 'sample', diversity_metric = 'simpson') {
+propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, total_attributes = NA,
+                          diversity_attributes = 'sample', diversity_metric = 'simpson') {
 
     #calculate number of children per node
     ARBOLtree$Do(function(node) node$numChildren <- node$children %>% length)
@@ -334,8 +338,17 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #calculate total n samples for diversity propagation
     totalsamples <- srobj@meta.data$sample %>% unique %>% length
 
-    #propagate node size up tree
-    ARBOLtree$Do(function(node) node[['n']] <- Aggregate(node, attribute = 'n', aggFun = sum), traversal = "post-order")
+    #add number of cells per node to totals
+    if (!is.element('n',total_attributes)) {
+      total_attributes = c('n',total_attributes)
+    }
+
+    #propagate totals variables up tree by summing the end-nodes
+    if(is.character(total_attributes)) {
+      for (y in total_attributes){
+        ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+      }
+    }
 
     #propagate numerical variables up tree by counting occurrences of each variant z of category y in each node
     if(is.character(numerical_attributes)) {                     
@@ -516,6 +529,7 @@ getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reducti
 #' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
+#' @param totals attributes for which to sum values per node.
 #' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
 #' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
@@ -533,9 +547,10 @@ getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reducti
 #' @export
 ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 'sample', 
                                 diversity_metric = 'simpson', counts = 'sample',
-                                tree_reduction = 'centroids', hclust_method = 'complete',
-                                distance_method = 'euclidean', centroid_method = 'mean', 
-                                centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), 
+                                totals = 'nCount_RNA', tree_reduction = 'centroids', 
+                                hclust_method = 'complete', distance_method = 'euclidean', 
+                                centroid_method = 'mean', centroid_assay = 'SCT', 
+                                reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), 
                                 nboot = 1) {
 
 
@@ -562,12 +577,12 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
   binarydf <- binaryTreeToDF(pvclust_tree=srobj@misc$pvclust)
 
   divtree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
-                                diversity_metric = diversity_metric, counts = counts)
+                                diversity_metric = diversity_metric, counts = counts, totals = totals)
 
-  divtree <- propagateTree(divtree,srobj=srobj, categorical_attributes = categories, 
-    diversity_attributes = diversities, numerical_attributes = counts)
+  divtree <- propagateTree(divtree,srobj = srobj, categorical_attributes = categories, 
+    diversity_attributes = diversities, numerical_attributes = counts, total_attributes = totals)
 
-  x <- data.tree_to_ggraph(divtree, categories, diversities, counts)
+  x <- data.tree_to_ggraph(divtree, categories, diversities, counts, totals)
 
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(label, "\\."))
 
@@ -604,6 +619,7 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
 
   return(srobj)
 }
+
 
 #' custom cosine distance method for pvclust
 cosine <- function(x) {
@@ -647,12 +663,12 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
 #' 2) convert dendrogram structure object to ggraph using tidygraph::as_tbl_graph
 #' 3) left join heights, categories, diversities, and counts to tbl_graph object
 #' previous version data.tree_to_ggraphNW used highly inefficient newick text conversion for tree structure
-data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heightAttribute = 'plotHeight') {
+data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, totals, heightAttribute = 'plotHeight') {
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
-  treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
+  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols,totals))
+  treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals))
   x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
   return(x)
@@ -665,13 +681,14 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, heig
 #' @param diversities attributes for which to calculate diversity in each node. Currently only supports gini-simpson's index.
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
+#' @param totals attributes for which to sum values per node.
 #' @return tree with attributes alloted to internal nodes
 #' @export 
-treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts) {
+treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts, totals) {
   srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
 
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
-          dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
+          dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')),all_of(totals))
 
   categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),','))))
 
@@ -679,6 +696,18 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 
   jointb <- jointb %>% select(-all_of(categories)) %>% 
             summarize(ids = list(CellID),n=unique(n))
+
+  totalsdf <- srobj@meta.data %>% dplyr::select(CellID,tierNident,all_of(totals))
+
+  for (x in totals) {
+    attribute <- enquo(x)
+    totalstb <- totalsdf %>% dplyr::select(tierNident,x) %>% group_by(tierNident) %>%
+        summarize(tierNident=unique(tierNident),sum(.data[[attribute]]))
+    colnames(totalstb) <- c('tierNident',x)
+    totalsdf <- totalsdf %>% dplyr::select(-x) %>% left_join(totalstb)
+  }
+
+  totalsdf <- totalsdf %>% select(-CellID) %>% distinct
 
   numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
 
@@ -695,7 +724,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 
   numericaltb <- numericaltb %>% select(-CellID,-sample,-all_of(counts)) %>% distinct
 
-  finaltreedf <- treedf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
+  finaltreedf <- treedf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb) %>% left_join(totalsdf)
 
   tree <- as.Node(finaltreedf)
 
