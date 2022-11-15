@@ -947,7 +947,9 @@ spread_tierN <- function(df, max_tiers = 10) {
 
     for(x in seq(1,max_tiers)) {
         df <- df %>% mutate(tierfull = strex::str_before_nth(tierNident, '\\.', n=x))
-        df$tierfull[!grepl(paste0('T',x),df$tierfull)] <- NA
+        # following line was left-over code causing problems in alternative ARBOL tree building. 
+        # keeping it commented here for now in case something breaks in subclusteringTree() function, can try adding it back
+        #df$tierfull[!grepl(paste0('T',x),df$tierfull)] <- NA
         names(df)[names(df) == 'tierfull'] <- paste0('tier',x,'full')
     }
 
