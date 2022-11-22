@@ -655,7 +655,7 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
 }
 
 #' data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
-#' then ape (still doesn't carry annotations) to ggraph, 
+#' then ape (still doesn't carry annotations) to ggraph,
 #' then join data frame of data.tree to restore annotations.
 #' requires 'n' and 'pathString' annotations in data.tree
 #' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
@@ -988,8 +988,21 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
 
   if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
-          tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
-          tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
+      #if only one cell state, calculate markers against all other cells
+          if(length(Idents(obj))==1) {
+            type = unique(Idents(obj))
+            tmpobj <- srobj
+            Idents(tmpobj) <- ifelse(srobj@meta.data[[celltype_col]]==type,type,'other')
+            message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
+            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
+            #remove markers for all the other cells from the table
+              filter(cluster!='other')
+            tmp[[celltype_col]] <- type
+          }
+          else {
+            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+            tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
+          }
            return(tmp)})
     write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
   }
@@ -1003,16 +1016,19 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
            fccol <- grep("FC",colnames(cellStateDF))
             biomarkers <- cellStateDF %>%
           mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(cellStateDF[,!!fccol], as.numeric) * (pct.1 / (pct.2 + 1e-300))) %>%
-                    group_by(cluster) %>% dplyr::slice_max(n=n_genes, order_by=rnkscr, with_ties=F) %>% 
+                    group_by(across(celltype_col),cluster) %>% dplyr::slice_max(n=n_genes, order_by=rnkscr, with_ties=F) %>% 
                     arrange(cluster, desc(rnkscr));
 
-              endname <- biomarkers %>% dplyr::summarize(markers = paste(gene, collapse="."))
-
-              endname <- endname %>% dplyr::select(cluster,markers)
-              endname[[celltype_col]] <- unique(cellStateDF[[celltype_col]])
+              endname <- biomarkers %>% dplyr::mutate(markers = paste(gene, collapse=".")) %>% 
+                    dplyr::select(-p_val,-avg_log2FC,-pct.1,-pct.2,-p_val_adj,-rnkscr)
+        
+              endname <- endname %>% dplyr::select(-gene) %>% unite({{standardname_col}},-cluster,sep='.',remove=F)        
+                
+            endname <- endname %>% distinct
+        
               return(endname)
                  },
-           error = function(e) { #message(sprintf('standard name calculation failed for a cluster... reason: ',e)) 
+           error = function(e) { message(sprintf('standard name calculation failed for a %s cluster... reason: %s',unique(cellStateDF[[celltype_col]])[1],e)) 
            })
                })
 
@@ -1045,6 +1061,88 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
   row.names(srobj@meta.data) <- srobj@meta.data$CellID
 
   return(srobj)
+}
+
+#' Calculate curated names for set of clusters as function of their major type
+#' @param srobj a seurat object with a celltype metadata column, specified in celltype_col, 
+#' CellID (for preserving metadata rownames), and tierNident (i.e. srobj@@meta.data$CellID, srobj@@meta.data$tierNident)
+#' @param figdir the figdir from an ARBOL run 
+#' @param max_cells_per_ident maximum cells to use in FindAllMarkers call. defaults to 200
+#' @param celltype_col the metadata column corresponding to celltype to assign standard names
+#' @param standardname_col metadata column to which to output celltype names. defaults to 'curatedname'
+#' @param n_genes number of genes with which to create standard names. defaults to 2
+#' @return a dataframe with standard names per end-cluster
+#' @examples
+#' srobj <- outputStandardNames(srobj,figdir='ARBOLoutput/figs')
+#' @export
+outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_col = 'celltype', 
+                              standardname_col = 'curatedname', n_genes = 2) {
+
+  if (!is.element('CellID',colnames(srobj@meta.data))) {
+    message('you are missing the CellID column - function will fail with confusing error message')
+  }
+  if (!is.element('tierNident',colnames(srobj@meta.data))) {
+    message('you are missing the tierNident column - function will fail with confusing error message')
+  }
+
+  Idents(srobj) <- srobj@meta.data[[celltype_col]]
+  typeobjs <- SplitSrobjOnMeta(srobj, meta=celltype_col,'typeobjects')
+
+  if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
+    cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
+      #if only one cell state, calculate markers against all other cells
+          if(length(Idents(obj))==1) {
+            type = unique(Idents(obj))
+            tmpobj <- srobj
+            Idents(tmpobj) <- ifelse(srobj@meta.data[[celltype_col]]==type,type,'other')
+            message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
+            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
+            #remove markers for all the other cells from the table
+              filter(cluster!='other')
+            tmp[[celltype_col]] <- type
+          }
+          else {
+            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+            tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
+          }
+           return(tmp)})
+    write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
+  }
+  else {
+    cellStateMarkers <- fread(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) %>%
+                    split(f=.$cluster)
+  }
+  
+   markersL <- lapply(cellStateMarkers,function(cellStateDF) {
+    tryCatch({
+           fccol <- grep("FC",colnames(cellStateDF))
+            biomarkers <- cellStateDF %>%
+          mutate(rnkscr = -log(p_val_adj+1e-310) * sapply(cellStateDF[,!!fccol], as.numeric) * (pct.1 / (pct.2 + 1e-300))) %>%
+                    group_by(across(celltype_col),cluster) %>% dplyr::slice_max(n=n_genes, order_by=rnkscr, with_ties=F) %>% 
+                    arrange(cluster, desc(rnkscr));
+
+              endname <- biomarkers %>% dplyr::mutate(markers = paste(gene, collapse=".")) %>% 
+                    dplyr::select(-p_val,-avg_log2FC,-pct.1,-pct.2,-p_val_adj,-rnkscr)
+        
+              endname <- endname %>% dplyr::select(-gene) %>% unite({{standardname_col}},-cluster,sep='.',remove=F)        
+                
+            endname <- endname %>% distinct
+        
+              return(endname)
+                 },
+           error = function(e) { message(sprintf('standard name calculation failed for a %s cluster... reason: %s',unique(cellStateDF[[celltype_col]])[1],e)) 
+           })
+               })
+
+  suppressWarnings( bind_rows(markersL) -> markersAsList)
+
+  message(sprintf('number of tierNident-celltype pairs for which at least %s biomarkers were found: ',n_genes),
+       length(markersAsList$cluster))
+  message('total number of end clusters: ',length(unique(srobj@meta.data$tierNident)))
+
+  markersAsList <- markersAsList %>% dplyr::rename(tierNident=cluster)
+
+  return(markersAsList)
 }
 
 #' remake ggraph object with new categories and diversities, useful to add curatednames
