@@ -989,7 +989,7 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
   if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
       #if only one cell state, calculate markers against all other cells
-          if(length(Idents(obj))==1) {
+          if(length(unique(Idents(obj)))==1) {
             type = unique(Idents(obj))
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(srobj@meta.data[[celltype_col]]==type,type,'other')
@@ -1091,7 +1091,7 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
   if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
       #if only one cell state, calculate markers against all other cells
-          if(length(Idents(obj))==1) {
+          if(length(unique(Idents(obj)))==1) {
             type = unique(Idents(obj))
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(srobj@meta.data[[celltype_col]]==type,type,'other')
