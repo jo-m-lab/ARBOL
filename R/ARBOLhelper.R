@@ -147,7 +147,7 @@ diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') 
   #enquo parameters to allow dplyr calls
     divcols <- enquo(species)
     #count groups per species
-    tierNcount <- df %>% group_by_at(vars(!!divcols)) %>% count(.data[[group]])
+    tierNcount <- df %>% group_by_at(vars(!!divcols)) %>% dplyr::count(.data[[group]])
     #obtain total N per group
     nums <- tierNcount %>% summarize(nums=sum(n))
     #add N to count dataframe
@@ -180,7 +180,7 @@ diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') 
 #' @export
 SIperIDs <- function(df, group, diversity_metric = 'simpson') {
     #count groups
-    tierNcount <- df %>% count(.data[[group]])
+    tierNcount <- df %>% dplyr::count(.data[[group]])
     #obtain total N per group
     nums <- tierNcount %>% summarize(nums=sum(n))
     #add N to count dataframe
@@ -228,7 +228,7 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 
     for (x in numerical_attributes) {
       attribute <- enquo(x)
-      tierNcount <- numericaltb %>% group_by(tierNident) %>% count(.data[[attribute]])
+      tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
       vals <- unique(tierNcount[[x]])
       countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
       colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
@@ -713,7 +713,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 
   for (x in counts) {
   attribute <- enquo(x)
-  tierNcount <- numericaltb %>% group_by(tierNident) %>% count(.data[[attribute]])
+  tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
   vals <- unique(tierNcount[[x]])
   countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
   colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
@@ -994,7 +994,7 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(srobj@meta.data[[celltype_col]]==type,type,'other')
             message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
-            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
+            tmp <- FindAllMarkers(tmpobj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
             #remove markers for all the other cells from the table
               filter(cluster!='other')
             tmp[[celltype_col]] <- type
@@ -1187,7 +1187,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   for (x in counts) {
     attribute <- enquo(x)
-    tierNcount <- numericaltb %>% group_by(tierNident) %>% count(.data[[attribute]])
+    tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
     vals <- unique(tierNcount[[x]])
     countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
     colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
