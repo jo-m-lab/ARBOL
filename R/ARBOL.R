@@ -495,12 +495,11 @@ SplitSrobjOnIdents <- function(srobj, proj_nm_suffix) {
 }
 
 SplitSrobjOnMeta <- function(srobj, meta, proj_nm_suffix) {
-  metacol <- grep(meta,colnames(srobj@meta.data))
-    lapply(unique(srobj@meta.data[,metacol]),
+    lapply(unique(srobj@meta.data[[meta]]),
          function(x) {tmp <- subset(srobj, cells= (srobj@meta.data %>% 
-                          filter(srobj@meta.data[,metacol]==x) %>% pull(CellID))); 
+                          filter(.data[[meta]]==x) %>% pull(CellID))); 
          tmp@project.name=paste0(tmp@project.name, x, proj_nm_suffix, sep="_");
-         tmp@meta.data <- srobj@meta.data %>% filter(srobj@meta.data[,metacol] == x)
+         tmp@meta.data <- srobj@meta.data %>% filter(.data[[meta]] == x)
          return(tmp)})
 }
 
