@@ -990,14 +990,15 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
       #if only one cell state, calculate markers against all other cells
           if(length(unique(Idents(obj)))==1) {
-            ident = unique(Idents(obj))
+            ident = unique(obj@meta.data$tierNident)
+            type = unique(obj@meta.data[[celltype_col]])
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(tmpobj@meta.data$tierNident==ident,ident,'other')
             message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
             tmp <- FindAllMarkers(tmpobj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
             #remove markers for all the other cells from the table
               filter(cluster!='other')
-            tmp[[celltype_col]] <- ident
+            tmp[[celltype_col]] <- type
           }
           else {
             tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
