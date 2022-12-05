@@ -1221,32 +1221,6 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 dMcast<-function(data,formula,fun.aggregate='sum',value.var=NULL,as.factors=FALSE,factor.nas=TRUE,drop.unused.levels=TRUE)
 {
 
-  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)),)
-
-  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)))
-
-  setAs('data.frame','dgeMatrix', function (from) as(as.matrix(from),'dgeMatrix'))
-
-  setAs('data.frame','dgCMatrix', function (from) as(as.matrix(from),'dgCMatrix'))
-
-  setAs('matrix','data.frame',function (from) as.data.frame(from))
-
-  setAs('vector','data.frame',function (from) data.frame(from))
-
-  setMethod("cbind2",c('data.frame','Matrix'),function (x,y) 
-  {
-    y<-as.matrix(y)
-    cbind2(x,y)
-  }
-  )
-
-  setMethod("cbind2",c('Matrix','data.frame'),function (x,y) 
-  {
-    y<-as.matrix(y)
-    cbind2(x,y)
-  }
-  )
-
   values<-1
   if(!is.null(value.var))
     values<-data[,value.var]
@@ -1306,32 +1280,6 @@ dMcast<-function(data,formula,fun.aggregate='sum',value.var=NULL,as.factors=FALS
 aggregate.Matrix<-function(x,groupings=NULL,form=NULL,fun='sum',...)
 {
 
-  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)),)
-
-  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)))
-
-  setAs('data.frame','dgeMatrix', function (from) as(as.matrix(from),'dgeMatrix'))
-
-  setAs('data.frame','dgCMatrix', function (from) as(as.matrix(from),'dgCMatrix'))
-
-  setAs('matrix','data.frame',function (from) as.data.frame(from))
-
-  setAs('vector','data.frame',function (from) data.frame(from))
-
-  setMethod("cbind2",c('data.frame','Matrix'),function (x,y) 
-  {
-    y<-as.matrix(y)
-    cbind2(x,y)
-  }
-  )
-
-  setMethod("cbind2",c('Matrix','data.frame'),function (x,y) 
-  {
-    y<-as.matrix(y)
-    cbind2(x,y)
-  }
-  )
-  
   if(!is(x,'Matrix'))
     x<-Matrix(as.matrix(x),sparse=TRUE)
   if(fun=='count')
@@ -1374,3 +1322,29 @@ aggregate2.Matrix<-function(x,groupings=NULL,form=NULL,fun=sum,...)
   return(results)
 }
   
+setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)),)
+
+setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)))
+
+setAs('data.frame','dgeMatrix', function (from) as(as.matrix(from),'dgeMatrix'))
+
+setAs('data.frame','dgCMatrix', function (from) as(as.matrix(from),'dgCMatrix'))
+
+setAs('matrix','data.frame',function (from) as.data.frame(from))
+
+setAs('vector','data.frame',function (from) data.frame(from))
+
+setMethod("cbind2",c('data.frame','Matrix'),function (x,y) 
+{
+  y<-as.matrix(y)
+  cbind2(x,y)
+}
+)
+
+setMethod("cbind2",c('Matrix','data.frame'),function (x,y) 
+{
+  y<-as.matrix(y)
+  cbind2(x,y)
+}
+)
+
