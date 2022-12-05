@@ -1220,6 +1220,33 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 ###Sparse matrix aggregation functions pulled from the (now defunct) Matrix.utils package
 dMcast<-function(data,formula,fun.aggregate='sum',value.var=NULL,as.factors=FALSE,factor.nas=TRUE,drop.unused.levels=TRUE)
 {
+
+  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)),)
+
+  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)))
+
+  setAs('data.frame','dgeMatrix', function (from) as(as.matrix(from),'dgeMatrix'))
+
+  setAs('data.frame','dgCMatrix', function (from) as(as.matrix(from),'dgCMatrix'))
+
+  setAs('matrix','data.frame',function (from) as.data.frame(from))
+
+  setAs('vector','data.frame',function (from) data.frame(from))
+
+  setMethod("cbind2",c('data.frame','Matrix'),function (x,y) 
+  {
+    y<-as.matrix(y)
+    cbind2(x,y)
+  }
+  )
+
+  setMethod("cbind2",c('Matrix','data.frame'),function (x,y) 
+  {
+    y<-as.matrix(y)
+    cbind2(x,y)
+  }
+  )
+
   values<-1
   if(!is.null(value.var))
     values<-data[,value.var]
@@ -1278,6 +1305,33 @@ dMcast<-function(data,formula,fun.aggregate='sum',value.var=NULL,as.factors=FALS
 
 aggregate.Matrix<-function(x,groupings=NULL,form=NULL,fun='sum',...)
 {
+
+  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)),)
+
+  setAs('Matrix','data.frame',function (from) as.data.frame(as.matrix(from)))
+
+  setAs('data.frame','dgeMatrix', function (from) as(as.matrix(from),'dgeMatrix'))
+
+  setAs('data.frame','dgCMatrix', function (from) as(as.matrix(from),'dgCMatrix'))
+
+  setAs('matrix','data.frame',function (from) as.data.frame(from))
+
+  setAs('vector','data.frame',function (from) data.frame(from))
+
+  setMethod("cbind2",c('data.frame','Matrix'),function (x,y) 
+  {
+    y<-as.matrix(y)
+    cbind2(x,y)
+  }
+  )
+
+  setMethod("cbind2",c('Matrix','data.frame'),function (x,y) 
+  {
+    y<-as.matrix(y)
+    cbind2(x,y)
+  }
+  )
+  
   if(!is(x,'Matrix'))
     x<-Matrix(as.matrix(x),sparse=TRUE)
   if(fun=='count')
@@ -1300,3 +1354,23 @@ aggregate.Matrix<-function(x,groupings=NULL,form=NULL,fun='sum',...)
   return(result)
 }
 
+aggregate2.Matrix<-function(x,groupings=NULL,form=NULL,fun=sum,...)
+{
+  #if(!is(x,'Matrix'))
+    x<-as.matrix(x)
+  groupings2<-groupings
+  if(!is(groupings2,'data.frame'))
+    groupings2<-as(groupings2,'data.frame')
+  groupings2<-data.frame(lapply(groupings2,as.factor))
+  groupings2<-interaction(groupings2,sep = '_')
+  index<-grr::order2(groupings2)
+  breaks<-which(!duplicated(groupings2[index]))
+  results1<-fun(x[1:breaks[1],])
+  results<-matrix(results1,ncol=length(results1),nrow=length(breaks))
+  for (i in seq_len(length(breaks)-1)) 
+  {
+    results[i+1]<-fun(x[(breaks[i]+1):breaks[i+1],])
+  }
+  return(results)
+}
+  
