@@ -361,10 +361,14 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
         }
     }
 
+    #suppress warnings for R4.2 logical changes. Aggregate uses logicals that throw warnings in new logical usage
+    #https://www.r-bloggers.com/2022/04/new-features-in-r-4-2-0/
+    suppressWarnings({
     #propagate list of cell barcodes per node up the tree
-    ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
-    #also samples. introducing this line to the function enforces "sample" column in srobj metadata
-    ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
+      #also samples. introducing this line to the function enforces "sample" column in srobj metadata
+      ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
+    })
 
     #propagate additional categorical variables
     if(is.character(categorical_attributes)) { 
