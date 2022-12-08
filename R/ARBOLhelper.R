@@ -1163,12 +1163,13 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
 #' @param diversities diversities as in tree building functions
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
+#' @param totals attributes to sum up the tree per node
 #' @return the seurat object with ggraph object remade in srobj@@misc$tax_ggraph
 #' @examples
 #' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), 
-#'                        diversities = c('curatedname','celltype'))
+#'                        diversities = c('curatedname','celltype'), counts = c('celltype'))
 #' @export
-remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metric = 'simpson') {
+remake_ggraph2 <- function(srobj, categories, diversities, counts, totals = 'nCount_RNA', diversity_metric = 'simpson') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -1184,45 +1185,16 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   binarydf <- binaryTreeToDF(pvclust_tree=srobj@misc$pvclust)
 
-  srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
-
-  jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 
-            dplyr::select(CellID,sample,tierNident,n,all_of(categories),all_of(paste0(diversities,'_diversity')))
-
-  categorydf <- jointb %>% summarize(across(categories, ~ list(strsplit(paste(unique(.x),collapse=','),','))))
-
-  divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
-
-  jointb <- jointb %>% dplyr::select(-all_of(categories)) %>% 
-              summarize(ids = list(CellID),n=unique(n))
-
-  numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
-
-  for (x in counts) {
-    attribute <- enquo(x)
-    tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
-    vals <- unique(tierNcount[[x]])
-    countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
-    colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
-    numericaltb <- numericaltb %>% left_join(countWide)
-  }
-
-  numericaltb[is.na(numericaltb)] <- 0   
-
-  numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(counts)) %>% distinct           
-
-  finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
-
-  divtree <- as.Node(finaltreedf)
+  divtree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
+                                diversity_metric = diversity_metric, counts = counts, totals = totals)
 
   divtree <- propagateTree(divtree,srobj=srobj, categorical_attributes = categories, 
-    diversity_attributes = diversities, numerical_attributes = counts)
+    diversity_attributes = diversities, numerical_attributes = counts, total_attributes = totals)
 
-  srobj@misc$tax_ggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts)
+  srobj@misc$tax_ggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts, totals)
 
   return(srobj)
 
 }
-
 
 
