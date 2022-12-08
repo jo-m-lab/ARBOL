@@ -1169,7 +1169,7 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
 #' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), 
 #'                        diversities = c('curatedname','celltype'), counts = c('celltype'))
 #' @export
-remake_ggraph2 <- function(srobj, categories, diversities, counts, totals = 'nCount_RNA', diversity_metric = 'simpson') {
+remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCount_RNA', diversity_metric = 'simpson') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
