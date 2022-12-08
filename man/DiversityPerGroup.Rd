@@ -24,8 +24,10 @@ Calculate diversity index per group in a dataframe (adds '%s_diversity' column),
 diversity metric options same as those available in vegan diversity() function
 }
 \examples{
-dataframe <- dataframe \%>\% left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) \%>\% 
+dataframe <- dataframe \%>\% 
+             left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) \%>\% 
                            suppressMessages
-metadata <- metadata \%>\% left_join(diversityPerGroup(metadata, species=tierNident, group='sample')) \%>\% 
+metadata <- metadata \%>\% 
+            left_join(diversityPerGroup(metadata, species=tierNident, group='sample')) \%>\% 
                          suppressMessages
 }

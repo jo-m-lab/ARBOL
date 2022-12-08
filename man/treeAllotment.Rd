@@ -5,7 +5,15 @@
 \title{Allots seurat object metadata attributes to a data.tree object
 Once attributes are alloted, propagateTree should be run to propagate attributes up the tree.}
 \usage{
-treeAllotment(srobj, treedf, categories, diversities, diversity_metric, counts)
+treeAllotment(
+  srobj,
+  treedf,
+  categories,
+  diversities,
+  diversity_metric,
+  counts,
+  totals
+)
 }
 \arguments{
 \item{srobj}{a seurat object with ARBOL 'tierNident', 'CellID', 'sample' columns.}
@@ -17,6 +25,8 @@ treeAllotment(srobj, treedf, categories, diversities, diversity_metric, counts)
 \item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 
 \item{counts}{attributes for which to count unique values per node.}
+
+\item{totals}{attributes for which to sum values per node.}
 }
 \value{
 tree with attributes alloted to internal nodes

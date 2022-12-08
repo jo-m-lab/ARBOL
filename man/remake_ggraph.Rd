@@ -30,5 +30,6 @@ the seurat object with ggraph object remade in srobj@misc$tax_ggraph
 remake ggraph object with new categories and diversities, useful to add curatednames
 }
 \examples{
-srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), diversities = c('curatedname','celltype'))
+srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), 
+                       diversities = c('curatedname','celltype'))
 }

@@ -25,5 +25,6 @@ We suggest re-calculating tree (or just ggraph for viz) from here using centroid
 so that new endclusters are treated as leaf nodes
 }
 \examples{
-srobj <- mergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+srobj <- mergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), 
+                              thresholds = c(0.2,50))
 }

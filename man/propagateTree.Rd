@@ -10,6 +10,7 @@ propagateTree(
   srobj,
   numerical_attributes = NA,
   categorical_attributes = NA,
+  total_attributes = NA,
   diversity_attributes = "sample",
   diversity_metric = "simpson"
 )
@@ -25,6 +26,9 @@ creates a new column per unique value per attribute. counts are added as node$at
 \item{categorical_attributes}{categorical attributes are propagated up a tree as unique values per node. 
 also calculates a majority per node - majority added as node$attribute_majority}
 
+\item{total_attributes}{total attributes are numerical attributes that you want to propagate up the tree by summing
+the value of each node.}
+
 \item{diversity_attributes}{attributes for which to calculate diversity in each node. 
 Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()}
 
@@ -39,5 +43,7 @@ Propagate attributes up a data.tree object to enable manipulation and visualizat
 Automatically run when building trees using subclusteringTree or ARBOLcentroidTaxonomy
 }
 \examples{
-arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
+arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, 
+                           total_attributes = totals,
+                           diversity_attributes = diversities, numerical_attributes = NA)
 }

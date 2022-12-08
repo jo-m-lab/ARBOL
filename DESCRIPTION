@@ -19,7 +19,7 @@ Depends:
     vegan,
     reshape2,
     Matrix,
-    Matrix.utils,
+    Matrix.utils (== 0.9.8),
     ggfortify,
     ggpubr,
     ggrepel,
@@ -40,4 +40,4 @@ Remotes:
 License: GPL
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.2

@@ -138,9 +138,11 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return dataframe with species and diversity columns
 #' @examples
-#' dataframe <- dataframe %>% left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
+#' dataframe <- dataframe %>% 
+#'              left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
 #'                            suppressMessages
-#' metadata <- metadata %>% left_join(diversityPerGroup(metadata, species=tierNident, group='sample')) %>% 
+#' metadata <- metadata %>% 
+#'             left_join(diversityPerGroup(metadata, species=tierNident, group='sample')) %>% 
 #'                          suppressMessages
 #' @export
 diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') {
@@ -327,7 +329,9 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
 #' added as node$attribute_diversity
 #' @return data.tree object with attributes propagated to all nodes
 #' @examples
-#' arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = NA)
+#' arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, 
+#'                            total_attributes = totals,
+#'                            diversity_attributes = diversities, numerical_attributes = NA)
 #' @export
 propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categorical_attributes = NA, total_attributes = NA,
                           diversity_attributes = 'sample', diversity_metric = 'simpson') {
@@ -512,8 +516,8 @@ getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reducti
     #remember rownames
     rows = row.names(scaled.data.t)
 
-    #aggregate sparse matrix by cluster, taking median of each gene per cluster
-    agg.clst.cntrs<- aggregate.Matrix(scaled.data.t[rows,-1],groupings=scaled.data.t[rows,1,drop=FALSE],fun=centroid_method)
+    #aggregate sparse matrix by cluster, taking 'centroid_method' of each gene per cluster
+    agg.clst.cntrs<- Matrix.utils::aggregate.Matrix(scaled.data.t[rows,-1],groupings=scaled.data.t[rows,1,drop=FALSE],fun=centroid_method)
     clst.cntrs <- agg.clst.cntrs
 
     #transpose cluster centers dataframe
@@ -810,7 +814,8 @@ mergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent 
 #' and a merged data.tree object in srobj@@misc$workingTree
 #' @examples
-#' srobj <- mergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+#' srobj <- mergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), 
+#'                               thresholds = c(0.2,50))
 #' @export
 mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
@@ -848,7 +853,8 @@ mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return dataframe of new idents
 #' @examples
-#' mIdents <- mergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+#' mIdents <- mergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), 
+#'                                      thresholds = c(0.2,50))
 #' @export
 mergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) {
 
@@ -1159,7 +1165,8 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
 #' @param counts attributes for which to count unique values per node.
 #' @return the seurat object with ggraph object remade in srobj@@misc$tax_ggraph
 #' @examples
-#' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), diversities = c('curatedname','celltype'))
+#' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), 
+#'                        diversities = c('curatedname','celltype'))
 #' @export
 remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metric = 'simpson') {
 

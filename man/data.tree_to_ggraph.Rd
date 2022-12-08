@@ -3,7 +3,7 @@
 \name{data.tree_to_ggraph}
 \alias{data.tree_to_ggraph}
 \title{data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
-then ape (still doesn't carry annotations) to ggraph, 
+then ape (still doesn't carry annotations) to ggraph,
 then join data frame of data.tree to restore annotations.
 requires 'n' and 'pathString' annotations in data.tree
 Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
@@ -17,12 +17,13 @@ data.tree_to_ggraph(
   categories,
   diversities,
   counts,
+  totals,
   heightAttribute = "plotHeight"
 )
 }
 \description{
 data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
-then ape (still doesn't carry annotations) to ggraph, 
+then ape (still doesn't carry annotations) to ggraph,
 then join data frame of data.tree to restore annotations.
 requires 'n' and 'pathString' annotations in data.tree
 Used to convert annotated binary phylogeny tree to ggraph for easier plotting 

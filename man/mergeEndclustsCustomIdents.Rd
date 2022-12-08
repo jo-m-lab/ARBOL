@@ -22,5 +22,6 @@ Merges tierNidents with their nearest neighbors in a srobj-attached binary tree 
 outputs dataframe of new idents
 }
 \examples{
-mIdents <- mergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), thresholds = c(0.2,50))
+mIdents <- mergeEndclustsCustomIdents(srobj, threshold_attributes = c('sample_diversity','n'), 
+                                     thresholds = c(0.2,50))
 }

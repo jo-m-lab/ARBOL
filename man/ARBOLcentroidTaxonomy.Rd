@@ -12,6 +12,7 @@ ARBOLcentroidTaxonomy(
   diversities = "sample",
   diversity_metric = "simpson",
   counts = "sample",
+  totals = "nCount_RNA",
   tree_reduction = "centroids",
   hclust_method = "complete",
   distance_method = "euclidean",
@@ -32,6 +33,8 @@ ARBOLcentroidTaxonomy(
 \item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 
 \item{counts}{attributes for which to count unique values per node.}
+
+\item{totals}{attributes for which to sum values per node.}
 
 \item{tree_reduction}{either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj}
 
