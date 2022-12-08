@@ -157,7 +157,7 @@ diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') 
     #calculate fraction of sample per species
     tierNcount <- tierNcount %>% mutate(presence = n/nums)
     #Pivot table to allow vegan::diversity call
-    tierNwide <- tierNcount %>% select(-presence,-nums) %>% pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
+    tierNwide <- tierNcount %>% dplyr::select(-presence,-nums) %>% pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
     #rownames are necessary, here hacking rownames from enquo with alphanumeric gsub
     tierNwide <- tierNwide %>% column_to_rownames(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""))
     #NA to 0 necessary for vegan::diversity
@@ -190,7 +190,7 @@ SIperIDs <- function(df, group, diversity_metric = 'simpson') {
     #calculate fraction of each sample
     tierNcount <- tierNcount %>% mutate(presence = n/nums)
     #Pivot table to allow vegan::diversity call
-    tierNwide <- tierNcount %>% select(-presence,-nums) %>% pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
+    tierNwide <- tierNcount %>% dplyr::select(-presence,-nums) %>% pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
     #NA to 0 necessary for vegan::diversity
     tierNwide[is.na(tierNwide)] <- 0
     #calculate diversity. Can change simpson to other types. Second use of enquo hack just to be able to name it the diversity name, idk if this is necessary
@@ -223,7 +223,7 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
     categorydf <- jointb %>% summarize(across(categorical_attributes, ~ list(paste(unique(.x),collapse=', '))))
     divdf <- jointb %>% summarize_at(paste0(diversity_attributes,'_diversity'),unique)
 
-    jointb <- jointb %>% select(-all_of(categorical_attributes)) %>% 
+    jointb <- jointb %>% dplyr::select(-all_of(categorical_attributes)) %>% 
                 summarize(ids = list(CellID),n=unique(n))
 
     numericaltb <- meta %>% dplyr::select(CellID,sample,tierNident,all_of(numerical_attributes))
@@ -239,9 +239,9 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 
     numericaltb[is.na(numericaltb)] <- 0
 
-    numericaltb <- numericaltb %>% select(-CellID,-sample,-all_of(numerical_attributes)) %>% distinct
+    numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(numerical_attributes)) %>% distinct
 
-    treemeta <- meta %>% select(-all_of(categorical_attributes)) %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
+    treemeta <- meta %>% dplyr::select(-all_of(categorical_attributes)) %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
     
     return(treemeta)
 }
@@ -295,10 +295,10 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
 
   #convert to tbl_graph object to allow easy plotting with ggraph
   x <- tidygraph::as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
-      left_join(ARBOLdf %>% select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),
+      left_join(ARBOLdf %>% dplyr::select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),
                                     all_of(paste0(diversities,'_diversity')),all_of(count_cols)))
 
-  x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% select(to=i))
+  x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% dplyr::select(to=i))
 
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(name, "\\."))
 
@@ -509,7 +509,7 @@ getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reducti
     #place numerical representation in cell matrix t2
     t2$i <- match(t2$tierNident,t3$tierNident) %>% as.double
     #turn numerical representation matrix of tierNident to a sparse matrix
-    t4 <- Matrix(t2 %>% select(i) %>% unlist,sparse=TRUE)
+    t4 <- Matrix(t2 %>% dplyr::select(i) %>% unlist,sparse=TRUE)
     #add numerical representation of tierNident to a sparse matrix of actual data (to allow aggregation)
     scaled.data.t <- cbind(t4,scaled.data.mtx)
 
@@ -656,9 +656,9 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
   treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
-  treeDF <- treeDF %>% select(name=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
+  treeDF <- treeDF %>% dplyr::select(name=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
   x <- tidygraph::as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
-  x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
+  x <- x %>% activate(edges) %>% left_join(treeDF %>% dplyr::select(to=i,height=plotHeight))
   return(x)
 }
 
@@ -676,9 +676,9 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, tota
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
   treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols,totals))
-  treeDF <- treeDF %>% select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals))
+  treeDF <- treeDF %>% dplyr::select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals))
   x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
-  x <- x %>% activate(edges) %>% left_join(treeDF %>% select(to=i,height=plotHeight))
+  x <- x %>% activate(edges) %>% left_join(treeDF %>% dplyr::select(to=i,height=plotHeight))
   return(x)
 }
 
@@ -702,7 +702,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 
   divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
 
-  jointb <- jointb %>% select(-all_of(categories)) %>% 
+  jointb <- jointb %>% dplyr::select(-all_of(categories)) %>% 
             summarize(ids = list(CellID),n=unique(n))
 
   totalsdf <- srobj@meta.data %>% dplyr::select(CellID,tierNident,all_of(totals))
@@ -715,7 +715,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
     totalsdf <- totalsdf %>% dplyr::select(-x) %>% left_join(totalstb)
   }
 
-  totalsdf <- totalsdf %>% select(-CellID) %>% distinct
+  totalsdf <- totalsdf %>% dplyr::select(-CellID) %>% distinct
 
   numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
 
@@ -730,7 +730,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 
   numericaltb[is.na(numericaltb)] <- 0
 
-  numericaltb <- numericaltb %>% select(-CellID,-sample,-all_of(counts)) %>% distinct
+  numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(counts)) %>% distinct
 
   finaltreedf <- treedf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb) %>% left_join(totalsdf)
 
@@ -770,7 +770,7 @@ mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,binIdent = pathString)
   divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% select(CellID,mergedIdent=binIdent)) %>%
+  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% dplyr::select(CellID,mergedIdent=binIdent)) %>%
                      rename(tierNident=mergedIdent,rawIdent=tierNident)
 
   return(srobj)
@@ -839,7 +839,7 @@ mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
   srobj@meta.data <- srobj@meta.data %>% left_join(divdf3)
   srobj@meta.data$rawIdent <- srobj@meta.data$tierNident
   srobj@meta.data$tierNident <- srobj@meta.data$mIdent
-  srobj@meta.data <- srobj@meta.data %>% select(-mIdent)      
+  srobj@meta.data <- srobj@meta.data %>% dplyr::select(-mIdent)      
 
   srobj@misc$workingTree <- workingTree
 
@@ -907,7 +907,7 @@ binaryTreeToDF <- function(pvclust_tree) {
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' 
 #' x <- as_tbl_graph(ARBOLphylo, directed=T) %>% activate(nodes) %>% 
-#' left_join(ARBOLdf %>% select(name=pathString,sample_diversity,disease_diversity))
+#' left_join(ARBOLdf %>% dplyr::select(name=pathString,sample_diversity,disease_diversity))
 #' @export
 allotedTreeToDF <- function(tree, ...) {
     ARBOLdf <- ToDataFrameTree(tree, ...)
@@ -1193,7 +1193,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   divdf <- jointb %>% summarize_at(paste0(diversities,'_diversity'),unique)
 
-  jointb <- jointb %>% select(-all_of(categories)) %>% 
+  jointb <- jointb %>% dplyr::select(-all_of(categories)) %>% 
               summarize(ids = list(CellID),n=unique(n))
 
   numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
@@ -1209,7 +1209,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, diversity_metr
 
   numericaltb[is.na(numericaltb)] <- 0   
 
-  numericaltb <- numericaltb %>% select(-CellID,-sample,-all_of(counts)) %>% distinct           
+  numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(counts)) %>% distinct           
 
   finaltreedf <- binarydf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
 
