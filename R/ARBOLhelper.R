@@ -1204,6 +1204,9 @@ remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCou
 #' @param color_metadata variable for which to chart pies
 #' @param palette RColorBrewer palette to use for pie charts
 #' @param y_cutoff height on the chart above which to chart pies
+#' @param mode type of tree plot to add piecharts to - one of "subclusters" or "taxonomy"
+#' @param scaling_factor scaling factor used to change pie sizes in "subclusters" mode
+#' @param radius pie radius
 #' @return ggraph tree plot with pie charts at each node above the y_cutoff height
 #' @examples 
 #' b <- ggraph(srobj@@misc$tax_ggraph, layout='dendrogram', height=plotHeight*20) + 
@@ -1220,11 +1223,12 @@ remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCou
 #'    expand_limits(y=-5) + 
 #'    coord_cartesian(xlim=c(0,35),ylim=c(-10,10)) +
 #'    geom_node_point(aes(label=string),size=0)
-#' pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1')
+#' pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1',mode='taxonomy')
 #' @export
-pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, palette, y_cutoff = 1) {
+pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, palette, y_cutoff = 1,radius = 0.5, mode = 'subclusters', scaling_factor) {
     pie.colors <- brewer.pal(8,palette)[1:(srobj@meta.data[[color_metadata]] %>% unique %>% length)]
     names(pie.colors) <- paste0(tolower(color_metadata),'_n_',srobj@meta.data[[color_metadata]] %>% unique)
+
     pb <- ggplot_build(ggraph_plot)
     ptcols <- c('label','x','y','PANEL','group','shape','colour','size','fill','alpha','stroke')
 
@@ -1235,10 +1239,21 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, palette, y_cuto
     })
 
     data <- bind_rows(tail(data, n=1))
-    data <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% data.frame)
-    
-    final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y,r=0.4),data=data %>% dplyr::filter(y>=y_cutoff),
+
+    if(mode=='subclusters'){
+      data <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% data.frame)
+      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data = gg %>% filter(y>=y_cutoff),
                              cols=colnames(data)[grep(paste0('^',color_metadata,'_n'),data %>% colnames)]) + scale_fill_manual(values=pie.colors)
+    }
+    if(mode=='taxonomy') {
+      data <- data %>% data.frame %>% rename(name=label) %>% left_join(srobj@misc$cluster_ggraph %>% data.frame)
+      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y,r=radius),data=data %>% dplyr::filter(y>=y_cutoff),
+                             cols=colnames(data)[grep(paste0('^',color_metadata,'_n'),data %>% colnames)]) + scale_fill_manual(values=pie.colors)
+    }
+    if(!mode %in% c('subclusters','taxonomy')) {
+      message('\nincorrect mode chosen\nchoose a mode from "subclusters" or "taxonomy"\n')
+      return(invisible(NULL))
+    }
     
     return(final)
 }
