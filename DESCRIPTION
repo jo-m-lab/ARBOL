@@ -34,7 +34,8 @@ Depends:
 	glmGamPoi,
 	strex,
     cluster,
-    dendextend
+    dendextend,
+    scatterpie
 Remotes:
 	jo-m-lab/ARBOL
 License: GPL

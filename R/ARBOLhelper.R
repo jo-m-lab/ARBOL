@@ -1197,4 +1197,50 @@ remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCou
 
 }
 
+#' Transform ggraph tree plot to include pie charts at nodes
+#' @param ggraph_plot ggraph tree plot with at least one geom_node_point() layer
+#' @param srobj Seurat object with srobj@@misc$tax_ggraph that has metadata column for pie-chart graphs
+#' @param color_metadata variable for which to chart pies
+#' @param palette RColorBrewer palette to use for pie charts
+#' @param y_cutoff height on the chart above which to chart pies
+#' @return ggraph tree plot with pie charts at each node above the y_cutoff height
+#' @examples 
+#' b <- ggraph(srobj@@misc$tax_ggraph, layout='dendrogram', height=plotHeight*20) + 
+#'        geom_edge_elbow2(aes(color=node.subset_majority),edge_width=1) +
+#'    new_scale_color() +
+#'    geom_node_text(aes(filter = leaf, label = subset_majority %>% str_replace_all('_','/'), color = subset_majority), 
+#'                   nudge_y=-2.4,vjust=0.5,hjust=0,angle=270,size=8) +
+#'    scale_color_manual(values=pie.colors) +
+#'    new_scale_color() +
+#'    geom_node_text(aes(filter = leaf, label = n),color='grey30',nudge_y=-0.2,vjust=0.5,hjust=0,size=8,angle=270) + 
+#'    theme_classic() +
+#'    geom_node_point(aes(filter = leaf, color=sample_diversity),size=4,shape='square') + 
+#'    scale_color_gradient(low='grey90',high='grey10') +
+#'    expand_limits(y=-5) + 
+#'    coord_cartesian(xlim=c(0,35),ylim=c(-10,10)) +
+#'    geom_node_point(aes(label=string),size=0)
+#' pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1')
+#' @export
+pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, palette, y_cutoff = 1) {
+    pie.colors <- brewer.pal(8,palette)[1:(srobj@meta.data[[color_metadata]] %>% unique %>% length)]
+    names(pie.colors) <- paste0(tolower(color_metadata),'_n_',srobj@meta.data[[color_metadata]] %>% unique)
+    pb <- ggplot_build(ggraph_plot)
+    ptcols <- c('label','x','y','PANEL','group','shape','colour','size','fill','alpha','stroke')
+
+    data <- lapply(pb$data, function(x) {
+        if (setequal(colnames(x),ptcols)) {
+            data <- x
+        }
+    })
+
+    data <- bind_rows(tail(data, n=1))
+    data <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% data.frame)
+    
+    final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y,r=0.4),data=data %>% dplyr::filter(y>=y_cutoff),
+                             cols=colnames(data)[grep(paste0('^',color_metadata,'_n'),data %>% colnames)]) + scale_fill_manual(values=pie.colors)
+    
+    return(final)
+}
+
+
 
