@@ -487,7 +487,8 @@ centroidTaxonomy <- function(srobj, tree_reduction = 'centroids', hclust_method 
 #' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
-
+#' centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+#'                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 #' @export
 getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
                          centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {

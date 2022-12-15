@@ -34,3 +34,7 @@ the input seurat object with pvclust tree in srobj@misc$pvclust
 Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
 }
+\examples{
+centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
+                        centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
+}

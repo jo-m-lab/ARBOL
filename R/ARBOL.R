@@ -45,7 +45,6 @@ require(cluster)
 #' @param harmony_var variable over which to iterate harmony integration
 #' @return list of lists with all seurat objects (highly recommend using folder arguments for saving outputs)
 #' @export
-
 GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0,
                               PreProcess_fun = PreProcess_sctransform,
                               ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
@@ -350,11 +349,9 @@ PreProcess_sctransform <- function(srobj, ChoosePCs_fun = ChoosePCs_default, fig
 #' @param figure_dir directory where PC choice plots are saved
 #' @return list of PCs chosen
 #' @export
-
 ChoosePCs_default <- function(srobj, improved_diff_quantile=.85, significance=0.01, figure_dir=NULL) {
-  #' if num cells > 500 use elbow plot if small use jackstraw, 
-  #'   if none sig use first 2 pcs
-
+  # if num cells > 500 use elbow plot if small use jackstraw, 
+  #   if none sig use first 2 pcs
   if (ncol(srobj) > 500) {
     eigValues <- (srobj@reductions$pca@stdev)^2  ## EigenValues
     varExplained <- eigValues / sum(eigValues)

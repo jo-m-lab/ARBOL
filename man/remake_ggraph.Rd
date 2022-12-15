@@ -9,6 +9,7 @@ remake_ggraph(
   categories,
   diversities,
   counts,
+  totals = "nCount_RNA",
   diversity_metric = "simpson"
 )
 }
@@ -21,6 +22,8 @@ remake_ggraph(
 
 \item{counts}{attributes for which to count unique values per node.}
 
+\item{totals}{attributes to sum up the tree per node}
+
 \item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 }
 \value{
@@ -31,5 +34,5 @@ remake ggraph object with new categories and diversities, useful to add curatedn
 }
 \examples{
 srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), 
-                       diversities = c('curatedname','celltype'))
+                       diversities = c('curatedname','celltype'), counts = c('celltype'))
 }

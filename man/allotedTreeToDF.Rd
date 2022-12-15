@@ -23,5 +23,5 @@ txt <- ARBOL::ToNewickPS(divtree)
 ARBOLphylo <- ape::read.tree(text=txt)
 
 x <- as_tbl_graph(ARBOLphylo, directed=T) \%>\% activate(nodes) \%>\% 
-left_join(ARBOLdf \%>\% select(name=pathString,sample_diversity,disease_diversity))
+left_join(ARBOLdf \%>\% dplyr::select(name=pathString,sample_diversity,disease_diversity))
 }
