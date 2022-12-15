@@ -53,7 +53,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
                               res_scan_step = 5, res_scan_min = 0.01, res_scan_max = 3, res_scan_n = 40,
                               tierAllowedRecomb=0, harmony_var=NULL, DownsampleNum = 7500) {
   ######################################################################################################
-  #' make sure output directories exist
+  # make sure output directories exist
   ######################################################################################################
   if (!is.null(saveSROBJdir)) dir.create(saveSROBJdir, showWarnings = T, recursive = T)
   if (!is.null(figdir)) dir.create(figdir, showWarnings = T, recursive = T)
@@ -61,16 +61,16 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   SaveEndFileName <- paste0(SaveEndFileName, sprintf("_T%sC%s", tier, clustN))
   
   ######################################################################################################
-  #' make sure QC metadata exists
+  # make sure QC metadata exists
   ######################################################################################################
   if (tier == 0) {srobj$nFeature_RNA <- Matrix::colSums(srobj@assays$RNA@counts > 0)}
   if (tier == 0) {srobj$nCount_RNA <- Matrix::colSums(srobj@assays$RNA@counts)}
   if (tier == 0) {srobj$percent.mt <- PercentageFeatureSet(srobj, pattern = "^MT-")}
 
   ######################################################################################################
-  #' basic processing
+  # basic processing
   ###################################################################################################### 
-  #' subset to provided cells
+  # subset to provided cells
   if (is.null(cells)) {
     cells <- colnames(srobj)
   }
@@ -79,13 +79,13 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
 
   ######################################################################################################
 
-  #' keep track of position in tree for logging
+  # keep track of position in tree for logging
   message("Number of cells: ",paste0(ncol(working_srobj),collapse='\n'))
   message(paste0("Starting tier: ", tier, ", cluster: ", clustN, ", with ", ncol(working_srobj), " cells" ))
   if(!is.null(SaveEndNamesDir)) {
     message(paste0("file name: ", sprintf("%s/%s.tsv", SaveEndNamesDir, SaveEndFileName)))
   }
-  #' Basic QC plotting of end-nodes before interruption of recursion
+  # Basic QC plotting of end-nodes before interruption of recursion
   if(!is.null(figdir)){
     tryCatch({QC_Plotting(working_srobj, fig_dir = figdir)
             },
@@ -93,7 +93,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
             })
   }
   ######################################################################################################
-  #' check if too few cells or past tier 10. if so, return end-node without processing
+  # check if too few cells or past tier 10. if so, return end-node without processing
   ######################################################################################################
 
   if (min_cluster_size < 5) {
@@ -111,19 +111,19 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     return(working_srobj)
   }
   
-  #' Preprocessing: Run SCtransform or log transform, PCA, choose num PCs for downstream analysis, find neighbors.
+  # Preprocessing: Run SCtransform or log transform, PCA, choose num PCs for downstream analysis, find neighbors.
 
   tryCatch({working_srobj <- PreProcess_fun(working_srobj, fig_dir=figdir, regressVar = harmony_var)
           },
           error = function(e) {message('Pre-processing failure'); print(paste("Pre-processing error: ", e))
         })
   
-  #' Check if SCT ran successfully, if not, default back to log1p
+  # Check if SCT ran successfully, if not, default back to log1p
   if(!(cluster_assay %in% names(working_srobj@assays))){
     cluster_assay="RNA"
   }
 
-  #' Get optimum cluster resolution and cluster
+  # Get optimum cluster resolution and cluster
   tryCatch({res <- ChooseOptimalClustering_fun(working_srobj,
                                      assay=cluster_assay,
                                      PreProcess_fun = PreProcess_fun,
@@ -141,7 +141,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
           })
   
   ######################################################################################################
-  #' logging & plotting: pre-processing and cluster results
+  # logging & plotting: pre-processing and cluster results
   ###################################################################################################### 
 
   tryCatch({working_srobj <- Plotting(working_srobj, fig_dir = figdir)
@@ -150,10 +150,10 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   })
 
   ######################################################################################################
-  #' check if too few clusters to call end-node and end recursion
+  # check if too few clusters to call end-node and end recursion
   ######################################################################################################
 
-  #' if one cluster:
+  # if one cluster:
   if ( !(length(unique(Idents(working_srobj))) > 1) ) {
     #write end-node table and srobj
     EndNode_Write(working_srobj, srobj_dir = saveSROBJdir, endclust_dir = SaveEndNamesDir, filename = SaveEndFileName)
@@ -163,8 +163,8 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
     return(working_srobj)
   }
 
- #' if tier > 2 and
-  #' if two indistinguishable clusters, defined by # genes differential expression with FDR < 0.05
+ # if tier > 2 and
+  # if two indistinguishable clusters, defined by # genes differential expression with FDR < 0.05
 
   if ( (working_srobj@misc$tier > tierAllowedRecomb) ) {
 
@@ -188,16 +188,16 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   Node_Write(working_srobj, srobj_dir = saveSROBJdir)
 
   ######################################################################################################
-  #' recurse
+  # recurse
   ######################################################################################################
 
-  #' split all clusters into separate srobjs
+  # split all clusters into separate srobjs
   message("continuing to recurse")
 
   subsets <- SplitSrobjOnIdents(working_srobj, paste0("tier", tier))
 
   print(subsets)
-  #' recurse along subsets
+  # recurse along subsets
   return(lapply(seq_along(subsets),
                 function(i) {
                   saveSROBJdir_nextTier=NULL

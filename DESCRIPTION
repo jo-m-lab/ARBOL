@@ -19,7 +19,6 @@ Depends:
     vegan,
     reshape2,
     Matrix,
-    Matrix.utils (== 0.9.8),
     ggfortify,
     ggpubr,
     ggrepel,
@@ -36,8 +35,11 @@ Depends:
     cluster,
     dendextend,
     scatterpie
+Imports:
+    Matrix.utils
 Remotes:
-	jo-m-lab/ARBOL
+	jo-m-lab/ARBOL,
+    github::cvarrichio/Matrix.utils
 License: GPL
 Encoding: UTF-8
 LazyData: true
