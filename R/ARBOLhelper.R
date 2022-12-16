@@ -1243,7 +1243,7 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,ra
     }
     if(mode=='taxonomy') {
       data2 <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% activate(nodes) %>% data.frame)
-      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data=data %>% dplyr::filter(y>=y_cutoff),
+      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data=data2 %>% dplyr::filter(y>=y_cutoff),
                              cols=colnames(data2)[grep(paste0('^',color_metadata,'_n'),data2 %>% colnames)])
     }
     if(!mode %in% c('subclusters','taxonomy')) {
