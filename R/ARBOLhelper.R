@@ -1224,7 +1224,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCou
 #'    geom_node_point(aes(label=string),size=0)
 #' pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1',mode='taxonomy')
 #' @export
-pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,radius = 0.5, mode = 'subclusters', scaling_factor) {
+pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,radius = 0.5, mode = 'subclusters', scaling_factor=20) {
     pb <- ggplot_build(ggraph_plot)
     ptcols <- c('label','x','y','PANEL','group','shape','colour','size','fill','alpha','stroke')
 
@@ -1237,14 +1237,14 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,ra
     data <- bind_rows(tail(data, n=1))
 
     if(mode=='subclusters'){
-      data <- data %>% data.frame %>% rename(name=label) %>% left_join(srobj@misc$cluster_ggraph %>% activate(nodes) %>% data.frame)
-      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data = data %>% dplyr::filter(y>=y_cutoff),
-                             cols=colnames(data)[grep(paste0('^',color_metadata,'_n'),data %>% colnames)])
+      data2 <- data %>% data.frame %>% rename(name=label) %>% left_join(srobj@misc$cluster_ggraph %>% activate(nodes) %>% data.frame)
+      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data = data2 %>% dplyr::filter(y>=y_cutoff),
+                             cols=colnames(data2)[grep(paste0('^',color_metadata,'_n'),data2 %>% colnames)])
     }
     if(mode=='taxonomy') {
-      data <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% activate(nodes) %>% data.frame)
-      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y,r=radius),data=data %>% dplyr::filter(y>=y_cutoff),
-                             cols=colnames(data)[grep(paste0('^',color_metadata,'_n'),data %>% colnames)])
+      data2 <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% activate(nodes) %>% data.frame)
+      final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data=data %>% dplyr::filter(y>=y_cutoff),
+                             cols=colnames(data2)[grep(paste0('^',color_metadata,'_n'),dat2 %>% colnames)])
     }
     if(!mode %in% c('subclusters','taxonomy')) {
       message('\nincorrect mode chosen\nchoose a mode from "subclusters" or "taxonomy"\n')
