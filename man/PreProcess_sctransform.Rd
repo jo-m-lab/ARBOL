@@ -7,7 +7,8 @@
 PreProcess_sctransform(
   srobj,
   ChoosePCs_fun = ChoosePCs_default,
-  fig_dir = NULL
+  fig_dir = NULL,
+  ...
 )
 }
 \description{

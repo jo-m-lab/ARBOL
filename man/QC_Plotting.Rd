@@ -4,7 +4,7 @@
 \alias{QC_Plotting}
 \title{basic QC scatter plots}
 \usage{
-QC_Plotting(working_srobj, fig_dir = NULL)
+QC_Plotting(working_srobj, fig_dir = NULL, ...)
 }
 \description{
 basic QC scatter plots

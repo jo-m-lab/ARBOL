@@ -7,7 +7,8 @@
 ChooseOptimalClustering_default(
   srobj,
   downsample_num = Inf,
-  PreProcess_fun = PreProcess,
+  PreProcess_fun = PreProcess_sctransform,
+  harmony_var = harmony_var,
   ...
 )
 }
