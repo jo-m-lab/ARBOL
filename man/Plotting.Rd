@@ -6,7 +6,7 @@
 basic umap of clusters (using umap-learn, as only it is allowed on premade graphs)
 output heatmap of markers}
 \usage{
-Plotting(working_srobj, fig_dir = NULL)
+Plotting(working_srobj, fig_dir = NULL, ...)
 }
 \description{
 save basic cell counts
