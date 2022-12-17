@@ -1,7 +1,7 @@
 Package: ARBOL
 Type: Package
 Title: ARBOL: Tiered Clustering of Single Cell Data
-Version: 3.0.0
+Version: 4.0.0
 Author: Benjamin Doran, Kyle Kimler
 Maintainer: The package maintainer <kkimler@broadinstitute.org>
 Description: Iteratively clusters seurat object single cell datasets, choosing optimum resolution parameters at each stage of clustering. Outputs QC plots for each tier and stage. 
