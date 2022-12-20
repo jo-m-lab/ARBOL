@@ -134,7 +134,7 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
             error = function(e) {message('Resolution choice failure'); print(paste("Resolution choice error: ", e))
           })
   tryCatch({working_srobj <- FindClusters(working_srobj,
-                                resolution = res,
+                                resolution = res
                                 )
             },
             error = function(e) {message('FindClusters failure'); print(paste("Clustering error: ", e))
@@ -523,14 +523,14 @@ Node_Write <- function(working_srobj, srobj_dir = NULL) {
 QC_Plotting <- function(working_srobj, fig_dir=NULL, ...) {
   Idents(working_srobj) <- rep("all.data", ncol(working_srobj))
     
-  VlnPlot(working_srobj, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = -1)
-  ggsave(sprintf("%s/QC_vln_plot.png", fig_dir))
+  vlnplt <- VlnPlot(working_srobj, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = -1)
+  ggsave(plot=vlnplt, sprintf("%s/QC_vln_plot.png", fig_dir))
     
   #' basic QC scatter plots
-  FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "percent.mt")
-  ggsave(sprintf("%s/QC_scatter_plot_nCount_pctMito.png", fig_dir))
-  FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-  ggsave(sprintf("%s/QC_scatter_plot_nCount_nFeat.png", fig_dir))
+  ft1 <- FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "percent.mt")
+  ggsave(plot=ft1,sprintf("%s/QC_scatter_plot_nCount_pctMito.png", fig_dir))
+  ft2 <- FeatureScatter(working_srobj, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  ggsave(plot=ft2,sprintf("%s/QC_scatter_plot_nCount_nFeat.png", fig_dir))
   
 }
 
@@ -662,7 +662,8 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
     }
     
       #only perform calculations if you've done more iterations than res.step (res.step < 2 will throw errors)
-    if (i > res.step) {
+    #untested or statement
+    if (i >= res.step) {
         sil.average <- setNames(colMeans(sil.all.matrix), set.res[1:i])
         sil.medians <- setNames(apply(sil.all.matrix, 2, median), set.res[1:i])
 

@@ -1224,7 +1224,7 @@ remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCou
 #'    geom_node_point(aes(label=string),size=0)
 #' pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1',mode='taxonomy')
 #' @export
-pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,radius = 0.5, mode = 'subclusters', scaling_factor=20) {
+pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,radius = 0.5, mode = 'subclusters', scaling_factor=1) {
     pb <- ggplot_build(ggraph_plot)
     ptcols <- c('label','x','y','PANEL','group','shape','colour','size','fill','alpha','stroke')
 
