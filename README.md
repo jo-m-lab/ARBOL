@@ -33,8 +33,11 @@ https://hub.docker.com/r/kkimler/arbol
 
 ARBOL was developed and used in the paper, "A treatment-naïve cellular atlas of pediatric Crohn’s disease predicts disease severity and therapeutic response"
 
-Here is a vignette where ARBOL visualization and analysis is performed: 
+A vignette showing the full pipeline for ARBOL analysis is provided here: 
 https://jo-m-lab.github.io/ARBOL/ARBOLtutorial_22_12_20.html
+
+A second vignette explaining visualization methods can be found here:
+https://jo-m-lab.github.io/ARBOL/ARBOLvisualization_23_02_03.html
 
 This package is meant as a starting point for the way that we approached clustering and is meant to be edited/customized through community feedback through users such as yourself!  We have tried to organize the script such that
 each processing step is contained in a modular function that can be edited and
