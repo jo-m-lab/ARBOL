@@ -23,6 +23,7 @@ or clone the repository and source the functions directly from the script
 git clone https://github.com/jo-m-lab/ARBOL.git
 
 source("path/to/cloned/git/repo/R/ARBOL.R")
+source("path/to/cloned/git/repo/R/ARBOLhelper.R")
 ```
 
 there is a docker image available with ARBOL and dependencies preinstalled

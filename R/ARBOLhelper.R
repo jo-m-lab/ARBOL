@@ -39,7 +39,7 @@ ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
   
 }
 
-#Very slow, newick way
+#Very slow, conversion through Newick format
 as.phylo.NodeNW <- function(x, heightAttribute = DefaultPlotHeight, ...) {
   txt <- ToNewickPS(x, heightAttribute)
   return (ape::read.tree(text = txt))
@@ -206,12 +206,14 @@ SIperIDs <- function(df, group, diversity_metric = 'simpson') {
 #' @param categorical_attributes categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
 #' majority added as node$attribute_majority
 #' @param diversity_attributes attributes for which to calculate diversity in each node. 
+#' @param total_attributes total attributes are numerical attributes that you want to propagate up the tree by summing
+#' the value of each node.
 #' Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()
 #' @return a metadata dataframe ready for tree building
 #' @examples
 #' prepSubclusteringMetadata(srobj, maxtiers=10)
 #' @export
-prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes,numerical_attributes) {
+prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,diversity_attributes,numerical_attributes,total_attributes) {
     meta <- srobj@meta.data
 
     meta <- spread_tierN(meta,max_tiers=maxtiers)
@@ -226,6 +228,8 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
     jointb <- jointb %>% dplyr::select(-all_of(categorical_attributes)) %>% 
                 summarize(ids = list(CellID),n=unique(n))
 
+    totaldf <- meta %>% group_by(tierNident) %>% summarize(across(total_attributes, ~sum(.x)))
+    
     numericaltb <- meta %>% dplyr::select(CellID,sample,tierNident,all_of(numerical_attributes))
 
     for (x in numerical_attributes) {
@@ -241,7 +245,7 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 
     numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(numerical_attributes)) %>% distinct
 
-    treemeta <- meta %>% dplyr::select(-all_of(categorical_attributes)) %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb)
+    treemeta <- meta %>% dplyr::select(-all_of(categorical_attributes),-all_of(total_attributes)) %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb) %>% left_join(totaldf)
     
     return(treemeta)
 }
@@ -253,12 +257,14 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 #' @param diversities columns in metadata for which you want to calculate diversity per node 
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts columns in metadata for which you want to count each value per node
+#' @param totals attributes for which to sum values per node.
 #' @return the input seurat object with tiered clustering tree in srobj@@misc$subclusteringTree, 
 #' plot of tree to srobj@@misc$subclusteringViz, and ggraph object to srobj@@misc$cluster_ggraph
 #' @examples
 #' srobj <- subclusteringTree(srobj)
 #' @export
-subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', counts = 'sample') {
+subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', 
+                               counts = 'sample', totals = 'nCount_RNA') {
 
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
@@ -272,19 +278,26 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
     counts = c('sample',counts)
   }
 
-  srobj <- suppressMessages(tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric))
+  srobj <- suppressMessages(tierN_diversity(srobj, diversity_attributes = diversities,
+                                            diversity_metric = diversity_metric))
   
-  treemeta <- suppressMessages(prepSubclusteringMetadata(srobj, categorical_attributes = categories, diversity_attributes = diversities, numerical_attributes = counts))
+  treemeta <- suppressMessages(prepSubclusteringMetadata(srobj, categorical_attributes = categories, 
+                                                         diversity_attributes = diversities, 
+                                                         numerical_attributes = counts,
+                                                        total_attributes = totals))
 
   ARBOLtree <- suppressMessages(as.Node(treemeta))
 
-  Atree <- suppressMessages(propagateTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, categorical_attributes = categories, numerical_attributes = counts))
+  Atree <- suppressMessages(propagateTree(ARBOLtree, srobj=srobj, diversity_attributes = diversities, 
+                                          categorical_attributes = categories, numerical_attributes = counts,
+                                         total_attributes = totals))
 
   #obtain counts columns from propagated data tree
   attrs <- Atree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
 
-  ARBOLdf <- do.call(allotedTreeToDF, c(Atree,'n','pathString', categories, paste0(categories,'_majority'), paste0(diversities,'_diversity'),count_cols))
+  ARBOLdf <- do.call(allotedTreeToDF, c(Atree,'n','pathString', categories, paste0(categories,'_majority'), 
+                                        paste0(diversities,'_diversity'),count_cols,totals,'numChildren'))
 
   #simple code call of translation to df disallowing custom diversity_attributes
   #ARBOLdf <- allotedTreeToDF(Atree, 'tier1', 'n', 'pathString', 'sample_diversity')
@@ -296,7 +309,7 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
   #convert to tbl_graph object to allow easy plotting with ggraph
   x <- tidygraph::as_tbl_graph(ARBOLphylo,directed=T) %>% activate(nodes) %>% 
       left_join(ARBOLdf %>% dplyr::select(name=levelName,n,all_of(categories),all_of(paste0(categories,'_majority')),
-                                    all_of(paste0(diversities,'_diversity')),all_of(count_cols)))
+                                    all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals),'numChildren'))
 
   x <- x %>% activate(edges) #%>% left_join(ARBOLdf %>% dplyr::select(to=i))
 
@@ -591,7 +604,7 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
   divtree <- propagateTree(divtree,srobj = srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts, total_attributes = totals)
 
-  x <- data.tree_to_ggraph(divtree, categories, diversities, counts, totals)
+  x <- data.tree_to_ggraph(divtree, categories, diversities, counts, totals, 'numChildren')
 
   x <- x %>% activate(nodes) %>% mutate(tier = str_count(label, "\\."))
 
@@ -656,8 +669,11 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   apeTree <- ape::read.tree(text=txt)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
-  treeDF <- treeDF %>% dplyr::select(name=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols))
+  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval', 'numChildren',
+                    categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols))
+  treeDF <- treeDF %>% dplyr::select(name=pathString,n,i,plotHeight,pval,numChildren,
+                                      all_of(categories), all_of(paste0(categories,'_majority')),
+                                      all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals))
   x <- tidygraph::as_tbl_graph(apeTree,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% dplyr::select(to=i,height=plotHeight))
   return(x)
@@ -676,8 +692,11 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, tota
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
   attrs <- data.tree$attributesAll
   count_cols <- attrs[grep(sprintf('^(%s)_n',paste0(counts,collapse='|')),attrs)]
-  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval',categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols,totals))
-  treeDF <- treeDF %>% dplyr::select(label=pathString,n,i,plotHeight,pval,all_of(categories),all_of(paste0(categories,'_majority')),all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals))
+  treeDF <- do.call(allotedTreeToDF, c(data.tree, 'n','pathString','plotHeight', 'pval','numChildren',
+                                        categories, paste0(categories,'_majority'),paste0(diversities,'_diversity'),count_cols,totals))
+  treeDF <- treeDF %>% dplyr::select(label=pathString,n,i,plotHeight,pval,numChildren,
+                                    all_of(categories),all_of(paste0(categories,'_majority')),
+                                    all_of(paste0(diversities,'_diversity')),all_of(count_cols),all_of(totals))
   x <- tidygraph::as_tbl_graph(datadend,directed=T) %>% activate(nodes) %>% left_join(treeDF)
   x <- x %>% activate(edges) %>% left_join(treeDF %>% dplyr::select(to=i,height=plotHeight))
   return(x)
