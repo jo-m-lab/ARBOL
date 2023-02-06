@@ -245,7 +245,13 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 
     numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(numerical_attributes)) %>% distinct
 
-    treemeta <- meta %>% dplyr::select(-all_of(categorical_attributes),-all_of(total_attributes)) %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb) %>% left_join(totaldf)
+    treemeta <- meta %>% remove_rownames %>% 
+                    dplyr::select(-all_of(categorical_attributes),-all_of(total_attributes)) %>% 
+                    left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% 
+                    left_join(numericaltb) %>% left_join(totaldf) %>% 
+                    select(tierNident,pathString,n,ids,all_of(colnames(numericaltb)),all_of(colnames(totaldf)),
+                          all_of(colnames(categorydf)),all_of(colnames(divdf))) %>%
+                                        distinct
     
     return(treemeta)
 }
@@ -752,7 +758,12 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 
   numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(counts)) %>% distinct
 
-  finaltreedf <- treedf %>% left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% left_join(numericaltb) %>% left_join(totalsdf)
+  finaltreedf <- treedf %>% remove_rownames %>% 
+                    left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% 
+                    left_join(numericaltb) %>% left_join(totalsdf) %>% 
+                    select(tierNident,pathString,n,ids,all_of(colnames(numericaltb)),all_of(colnames(totalsdf)),
+                          all_of(colnames(categorydf)),all_of(colnames(divdf))) %>%
+                                        distinct
 
   tree <- as.Node(finaltreedf)
 
