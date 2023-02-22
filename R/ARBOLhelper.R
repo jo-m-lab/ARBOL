@@ -1045,7 +1045,7 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
             tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
             tryCatch({
               tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
-              }, error = function(e) {message(sprintf('standard name calculation failed for %s', ))})
+              }, error = function(e) {message(sprintf('standard name calculation failed for a whole clade: %s; reason: %s', celltype_col, e))})
           }
            return(tmp)})
     write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
