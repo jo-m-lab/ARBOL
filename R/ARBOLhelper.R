@@ -761,7 +761,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
   finaltreedf <- treedf %>% remove_rownames %>% 
                     left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% 
                     left_join(numericaltb) %>% left_join(totalsdf) %>% 
-                    select(tierNident,plotHeight,pathString,n,ids,all_of(colnames(numericaltb)),all_of(colnames(totalsdf)),
+                    select(tierNident,plotHeight,pval,pathString,n,ids,all_of(colnames(numericaltb)),all_of(colnames(totalsdf)),
                           all_of(colnames(categorydf)),all_of(colnames(divdf))) %>%
                                         distinct
 
