@@ -761,7 +761,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
   finaltreedf <- treedf %>% remove_rownames %>% 
                     left_join(jointb) %>% left_join(categorydf) %>% left_join(divdf) %>% 
                     left_join(numericaltb) %>% left_join(totalsdf) %>% 
-                    select(tierNident,pathString,n,ids,all_of(colnames(numericaltb)),all_of(colnames(totalsdf)),
+                    select(tierNident,plotHeight,pathString,n,ids,all_of(colnames(numericaltb)),all_of(colnames(totalsdf)),
                           all_of(colnames(categorydf)),all_of(colnames(divdf))) %>%
                                         distinct
 
@@ -979,8 +979,8 @@ tierN_diversity <- function(srobj, diversity_attributes, diversity_metric = 'sim
 #' @examples
 #' srobj@@meta.data <- spread_tierN(srobj@@meta.data)
 #' @export
-spread_tierN <- function(df, max_tiers = 10) {
-    df <- df %>% separate(tierNident,into=paste0('tier',seq(1,max_tiers)),remove=F)
+spread_tierN <- function(df, max_tiers = 10, sep='.') {
+    df <- df %>% separate(tierNident,into=paste0('tier',seq(1,max_tiers)),remove=F,sep=sep)
     df$tier0 <- 'T0C0'
 
     #add delimiter to end of tierNident to allow programmatic parsing!
@@ -1043,7 +1043,9 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
           }
           else {
             tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
-            tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
+            tryCatch({
+              tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
+              }, error = function(e) {message(sprintf('standard name calculation failed for %s', ))})
           }
            return(tmp)})
     write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
@@ -1070,7 +1072,7 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
         
               return(endname)
                  },
-           error = function(e) { message(sprintf('standard name calculation failed for a %s cluster... reason: %s',unique(cellStateDF[[celltype_col]])[1],e)) 
+           error = function(e) { message(sprintf('standard name calculation failed for a %s cluster... reason: %s', unique(cellStateDF[[celltype_col]])[1],e)) 
            })
                })
 
