@@ -144,10 +144,12 @@ GenTieredClusters <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0
   # logging & plotting: pre-processing and cluster results
   ###################################################################################################### 
 
-  tryCatch({working_srobj <- Plotting(working_srobj, fig_dir = figdir)
-  },
-  error = function(e) {message('Plotting failure'); message(paste("Plotting error: ", e))
-  })
+  if(!is.null(figdir)){
+    tryCatch({working_srobj <- Plotting(working_srobj, fig_dir = figdir)
+    },
+    error = function(e) {message('Plotting failure'); message(paste("Plotting error: ", e))
+    })
+  }
 
   ######################################################################################################
   # check if too few clusters to call end-node and end recursion
@@ -268,7 +270,7 @@ PreProcess_sctransform_harmony <- function(srobj, fig_dir=NULL, regressVar = NUL
   tryCatch({
             srobj <- SCTransform(object = srobj, verbose=TRUE, method='glmGamPoi')
            }, error=function(e) 
-           {message(sprintf('SCTransform failed to run, likely due to too few cells or RAM. cell num: %s .... Defaulting back to log1p normalization. error message: %s',ncol(srobj),e))
+           {message(sprintf('SCTransform failed to run, likely due to too few cells, RAM, or you inputted a seurat object that was already normalized. ARBOL needs raw data! cell num: %s .... Defaulting back to log1p normalization. error message: %s',ncol(srobj),e))
            })
   
   #If it fails, normalization defaults back to log1p
@@ -722,15 +724,15 @@ chooseResolution_SilhouetteAnalysisParameterScan <- function(
               width=10, height=4, useDingbats=FALSE)
           par(mfrow=c(1,3))
           # Resolution vs # of Clusters
-          plot(set.res, n.clusters, col="black", pch=19,
+          plot(set.res[1:i], n.clusters, col="black", pch=19,
                type="p", xlab="Resolution", ylab="# Clusters",
                main="Resolution vs. # Clusters")
           
           # Resolution vs Average Silhouette
-          plot(set.res, sil.average, col="black", pch=19,
+          plot(set.res[1:i], sil.average, col="black", pch=19,
                type="p", xlab="Resolution", ylab="Average Silhouette",
                main="Resolution vs. Average Silhouette")
-          points(set.res, sil.medians, col="red", pch=15)
+          points(set.res[1:i], sil.medians, col="red", pch=15)
           abline(h=hist.out$breaks[length(hist.out$breaks)-1], col="firebrick3", lty=2)
           abline(v=resolution.choice, col="dodgerblue2", lty=2)
           
