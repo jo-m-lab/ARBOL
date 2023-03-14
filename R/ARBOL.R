@@ -982,7 +982,7 @@ ARBOL <- function(srobj, cluster_assay = "SCT", cells = NULL, tier=0, clustN = 0
 
   endclustDF <- endclustDF %>% tidyr::separate(tierNident,into=paste0('tier',1:max_tiers),sep='\\.',remove=FALSE)
 
-  if (!is.null(SaveEndNamesDir)) write.csv(endclustDF,sprintf('%s/endclusts.csv',gsub("\\/[^\\/]+$","",SaveEndNamesDir)))
+  if (!is.null(SaveEndNamesDir)) write.csv(endclustDF, sprintf('%s.csv',SaveEndNamesDir))
 
   return(endclustDF)
 }
