@@ -369,7 +369,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #propagate totals variables up tree by summing the end-nodes
     if(is.character(total_attributes)) {
       for (y in total_attributes){
-        ARBOLtree$Do(function(node) node[[y]] <- Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+        ARBOLtree$Do(function(node) node[[y]] <- data.tree::Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
       }
     }
 
@@ -379,7 +379,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
             uniqs <- unique(srobj@meta.data[[y]])
             attrs = sprintf('%s_n_%s',y,uniqs)
             for (attr in attrs) {
-                ARBOLtree$Do(function(node) node[[attr]] <- Aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
+                ARBOLtree$Do(function(node) node[[attr]] <- data.tree::Aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
             }            
         }
     }
@@ -388,9 +388,9 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #https://www.r-bloggers.com/2022/04/new-features-in-r-4-2-0/
     suppressWarnings({
     #propagate list of cell barcodes per node up the tree
-      ARBOLtree$Do(function(node) node[['ids']] <- Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['ids']] <- data.tree::Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
       #also samples. introducing this line to the function enforces "sample" column in srobj metadata
-      ARBOLtree$Do(function(node) node[['samples']] <- Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['samples']] <- data.tree::Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
     })
 
     #propagate additional categorical variables
@@ -1036,7 +1036,7 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(tmpobj@meta.data$tierNident==ident,ident,'other')
             message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
-            tmp <- FindAllMarkers(tmpobj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
+            tmp <- FindAllMarkers(tmpobj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident) %>% 
             #remove markers for all the other cells from the table
               filter(cluster!='other')
             tmp[[celltype_col]] <- type

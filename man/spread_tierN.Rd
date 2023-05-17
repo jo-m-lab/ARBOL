@@ -4,7 +4,7 @@
 \alias{spread_tierN}
 \title{spread tierNident column in a dataframe into separate columns per tier, with full paths and single tier idents}
 \usage{
-spread_tierN(df, max_tiers = 10)
+spread_tierN(df, max_tiers = 10, sep = ".")
 }
 \arguments{
 \item{df}{a dataframe with ARBOL tierNident (usually srobj@meta.data)}

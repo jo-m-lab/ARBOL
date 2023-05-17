@@ -9,7 +9,8 @@ prepSubclusteringMetadata(
   maxtiers = 10,
   categorical_attributes,
   diversity_attributes,
-  numerical_attributes
+  numerical_attributes,
+  total_attributes
 )
 }
 \arguments{
@@ -20,11 +21,14 @@ prepSubclusteringMetadata(
 \item{categorical_attributes}{categorical attributes are propagated up a tree as unique values per node. also calculates a majority per node
 majority added as node$attribute_majority}
 
-\item{diversity_attributes}{attributes for which to calculate diversity in each node. 
-Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()}
+\item{diversity_attributes}{attributes for which to calculate diversity in each node.}
 
 \item{numerical_attributes}{numerical attributes are propagated up a tree as counts of each unique value per node.
 creates a new column per unique value per attribute. counts are added as node$attribute_n_value}
+
+\item{total_attributes}{total attributes are numerical attributes that you want to propagate up the tree by summing
+the value of each node.
+Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()}
 }
 \value{
 a metadata dataframe ready for tree building

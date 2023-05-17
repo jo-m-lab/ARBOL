@@ -4,7 +4,15 @@
 \alias{pieify_tree_plot}
 \title{Transform ggraph tree plot to include pie charts at nodes}
 \usage{
-pieify_tree_plot(ggraph_plot, srobj, color_metadata, palette, y_cutoff = 1)
+pieify_tree_plot(
+  ggraph_plot,
+  srobj,
+  color_metadata,
+  y_cutoff = 1,
+  radius = 0.5,
+  mode = "subclusters",
+  scaling_factor = 1
+)
 }
 \arguments{
 \item{ggraph_plot}{ggraph tree plot with at least one geom_node_point() layer}
@@ -13,9 +21,13 @@ pieify_tree_plot(ggraph_plot, srobj, color_metadata, palette, y_cutoff = 1)
 
 \item{color_metadata}{variable for which to chart pies}
 
-\item{palette}{RColorBrewer palette to use for pie charts}
-
 \item{y_cutoff}{height on the chart above which to chart pies}
+
+\item{radius}{pie radius}
+
+\item{mode}{type of tree plot to add piecharts to - one of "subclusters" or "taxonomy"}
+
+\item{scaling_factor}{scaling factor used to change pie sizes in "subclusters" mode}
 }
 \value{
 ggraph tree plot with pie charts at each node above the y_cutoff height
@@ -38,5 +50,5 @@ b <- ggraph(srobj@misc$tax_ggraph, layout='dendrogram', height=plotHeight*20) +
    expand_limits(y=-5) + 
    coord_cartesian(xlim=c(0,35),ylim=c(-10,10)) +
    geom_node_point(aes(label=string),size=0)
-pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1')
+pietree_plot <- pieify_tree_plot(b, srobj, 'polyp', 'Set1',mode='taxonomy')
 }

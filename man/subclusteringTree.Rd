@@ -10,7 +10,8 @@ subclusteringTree(
   categories = "sample",
   diversities = "sample",
   diversity_metric = "simpson",
-  counts = "sample"
+  counts = "sample",
+  totals = "nCount_RNA"
 )
 }
 \arguments{
@@ -23,6 +24,8 @@ subclusteringTree(
 \item{diversity_metric}{one of 'shannon', 'simpson', or 'invsimpson'}
 
 \item{counts}{columns in metadata for which you want to count each value per node}
+
+\item{totals}{attributes for which to sum values per node.}
 }
 \value{
 the input seurat object with tiered clustering tree in srobj@misc$subclusteringTree, 
