@@ -272,6 +272,11 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sample', diversity_metric = 'simpson', 
                                counts = 'sample', totals = 'nCount_RNA') {
 
+  if(any(srobj@meta.data$tierNident %like% '/')) {
+    message('tierNident column cannot contain "/"')
+    stop()
+  }
+  
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
   }
@@ -581,6 +586,10 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
                                 reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), 
                                 nboot = 1) {
 
+  if(any(srobj@meta.data$tierNident %like% '/')) {
+    message('tierNident column cannot contain "/"')
+    stop()
+  }
 
   if (!is.character(gene_list)) {
     gene_list = rownames(srobj[[centroid_assay]]@data)
