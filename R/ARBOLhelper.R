@@ -276,7 +276,7 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
     message('tierNident column cannot contain "/"')
     stop()
   }
-  
+
   if (!is.element('sample',diversities)) {
     diversities = c('sample',diversities)
   }
@@ -1295,5 +1295,54 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,ra
     return(final)
 }
 
+
+#' Compute and add z-scores of feature expression values to srobj@@misc$tax_ggraph
+#' REQUIRES srobj@@misc$tax_ggraph
+#' 
+#' This function calculates z-scores of the expression values of a given feature
+#' for each cell in the Seurat object. It then adds the mean z-score
+#' to the object's graph representation based on groupings determined by taxonomic trees.
+#'
+#' @param srobj A Seurat object with @@misc$tax_ggraph
+#' @param feature The name of the feature whose expression values are to be z-scored.
+#' @param assay The name of the assay slot where the data resides. default: RNA
+#'
+#' @return The updated graph object with the added mean z-scores for the given feature per node.
+#'
+#' @export
+#'
+ggraph_feature_zscore <- function(srobj, feature, assay) {
+  
+  expr_values <- FetchData(srobj, vars = feature, slot = "data")[[feature]]
+  z_scores <- scale(expr_values)[,1]
+  
+  cell_zscores_df <- data.frame(cell_id = colnames(srobj[[assay]]@data), 
+                                z_score = z_scores, stringsAsFactors = FALSE)
+
+  cell_to_pathString_df <- srobj@misc$taxTree$Get('ids')
+
+  names(cell_to_pathString_df) <- srobj@misc$taxTree$Get('pathString')
+
+  cell_to_pathString_df <- lapply(cell_to_pathString_df, unlist)
+
+  id_tibble <- tibble(
+     group_id = rep(names(cell_to_pathString_df), times = map_int(cell_to_pathString_df, length)),
+    cell_id = unlist(cell_to_pathString_df, recursive = FALSE)
+  )
+
+  df_with_group <- cell_zscores_df %>%
+    right_join(id_tibble, by = "cell_id")
+
+
+  mean_tibble <- df_with_group %>%
+    group_by(group_id) %>%
+    summarise(mean_z_score = mean(z_score, na.rm = TRUE)) %>%
+    rename(label = group_id, !!feature := mean_z_score)
+
+                                                  
+  srobj@misc$tax_ggraph <- srobj@misc$tax_ggraph %>% left_join(mean_tibble)
+
+  return(srobj@misc$tax_ggraph)
+}
 
 
