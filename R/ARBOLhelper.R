@@ -1311,7 +1311,7 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,ra
 #'
 #' @export
 #'
-ggraph_feature_zscore <- function(srobj, feature, assay) {
+feature_zscore <- function(srobj, feature, assay) {
   
   expr_values <- FetchData(srobj, vars = feature, slot = "data")[[feature]]
   z_scores <- scale(expr_values)[,1]
