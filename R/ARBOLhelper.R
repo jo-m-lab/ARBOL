@@ -811,7 +811,7 @@ mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
 
   srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% dplyr::select(CellID,mergedIdent=binIdent)) %>%
-                     rename(tierNident=mergedIdent,rawIdent=tierNident)
+                     dplyr::rename(tierNident=mergedIdent,rawIdent=tierNident)
 
   return(srobj)
 }
@@ -1278,12 +1278,12 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,ra
     data <- bind_rows(tail(data, n=1))
 
     if(mode=='subclusters'){
-      data2 <- data %>% data.frame %>% rename(name=label) %>% left_join(srobj@misc$cluster_ggraph %>% activate(nodes) %>% data.frame)
+      data2 <- data %>% data.frame %>% dplyr::rename(name=label) %>% left_join(srobj@misc$cluster_ggraph %>% activate(nodes) %>% data.frame)
       final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data = data2 %>% dplyr::filter(abs(y)>=y_cutoff),
                              cols=colnames(data2)[grep(paste0('^',color_metadata,'_n'),data2 %>% colnames)])
     }
     if(mode=='taxonomy') {
-      data2 <- data %>% data.frame %>% rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% activate(nodes) %>% data.frame)
+      data2 <- data %>% data.frame %>% dplyr::rename(string=label) %>% left_join(srobj@misc$tax_ggraph %>% activate(nodes) %>% data.frame)
       final <- ggraph_plot + geom_scatterpie(aes(x=x,y=y*scaling_factor,r=radius),data=data2 %>% dplyr::filter(abs(y)>=y_cutoff),
                              cols=colnames(data2)[grep(paste0('^',color_metadata,'_n'),data2 %>% colnames)])
     }
@@ -1337,7 +1337,7 @@ feature_zscore <- function(srobj, feature, assay) {
   mean_tibble <- df_with_group %>%
     group_by(group_id) %>%
     summarise(mean_z_score = mean(z_score, na.rm = TRUE)) %>%
-    rename(label = group_id, !!feature := mean_z_score)
+    dplyr::rename(label = group_id, !!feature := mean_z_score)
 
                                                   
   srobj@misc$tax_ggraph <- srobj@misc$tax_ggraph %>% left_join(mean_tibble)
