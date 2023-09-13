@@ -1,10 +1,12 @@
 #############################################
 ## ARBOL supported normalization functions ##
 #############################################
+#' @noRd
 .normalize_log1p <- function(srobj) {
     NormalizeData(object = srobj, verbose = FALSE)
     }
 
+#' @noRd
 .normalize_sct <- function(srobj) {
     SCTransform(object = srobj, verbose = FALSE, method = "glmGamPoi")
     }
@@ -29,15 +31,15 @@
 # examples 
 # nPCs <- ChoosePCs_default(srobj, figure_dir=fig_dir)
 #' 
-#' param srobj v4 seurat object
-#' param improved_diff_quantile percent variance explained of next PC to choose PC
-#' param significance JackStraw significance required to choose PC
-#' param reduction name of the reduction slot where to select the reduced
+#' @param srobj v4 seurat object
+#' @param improved_diff_quantile percent variance explained of next PC to choose PC
+#' @param significance JackStraw significance required to choose PC
+#' @param reduction name of the reduction slot where to select the reduced
 #'   dimensions for downstream analysis
 #' return vectors of PCs chosen
 #' @importFrom Seurat RunPCA JackStraw ScoreJackStraw
 #' @importFrom SeuratObject DefaultAssay Reductions
-#' 
+#' @noRd
 .choose_dims_default <- function(
         srobj,
         improved_diff_quantile = .85,
@@ -91,6 +93,7 @@
 ####################################
 # Helper function to process the seurat object at each step
 #' @importFrom Seurat FindVariableFeatures ScaleData RunPCA FindNeighbors
+#' @noRd
 .preprocess <- function(
         srobj,
         .normalize = .normalize_log1p,

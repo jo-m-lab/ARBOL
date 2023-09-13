@@ -17,7 +17,7 @@
 #' tiers <- GenTieredclusters(srobj)
 #'
 #' @rdname .gen_tiered_clusters
-#' @export
+#' @noRd
 #' 
 .gen_tiered_clusters <- function(
         srobj,
