@@ -5,7 +5,7 @@
 #' @description Performs ARBOL tiered hierarchical clustering on a seurat
 #'    object. Outputs a dataframe of tier membership per cell
 #' 
-#' @param srobj \code{SeuratObject} single cell dataset.
+#' @param srobj \code{Seurat} single cell dataset.
 #' @param PreProcess_fun function to use for preproccessing defaults to 
 #'   PreProcess_sctransform. PreProcess_sctransform_harmony now available.
 #' @param min_cluster_size integer, minimum number of cells to allow further
@@ -14,6 +14,9 @@
 #'   clustering. Defaults to 10.
 #' @param ChooseOptimalClustering_fun function that returns srobj with clusters
 #'   in `srobj$Best.Clusters` after choosing optimal clustering resolution.
+#' @param .normalize_data function that return a normalized seurat object. By 
+#'   default \code(.normalize_log1p) but can also choose \code(.normalize_sct)
+#'   or pass your own.
 #' @param res_scan_step integer, number of resolutions of decreasing score
 #'   before an early silhouette analysis resolution scan stop. Defaults to 5.
 #' @param res_scan_min integer, smallest resolution to scan. Defaults to 0.01.
@@ -23,7 +26,7 @@
 #' @param harmony_var character string, variable over which to run harmony
 #'   integration.
 #' @param DownsampleNum integer, number of cells to downsample to when running
-#'  the silhouette scan.
+#'   the silhouette scan.
 #' @return dataframe with tierN cluster membership per cell
 #' 
 #' @details
@@ -50,6 +53,7 @@ ARBOL <- function(
         min_cluster_size = 100,
         max_tiers = 10,
         ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
+        .normalize_data = .normalize_log1p,
         res_scan_step = 5,
         res_scan_min = 0.01,
         res_scan_max = 1,
@@ -69,15 +73,22 @@ ARBOL <- function(
         is.numeric(res_scan_max) & length(res_scan_max) == 1,
         is.numeric(res_scan_n) & length(res_scan_n) == 1,
         is.numeric(DownsampleNum) & length(DownsampleNum) == 1,
+        DownsampleNum < Inf,
         is.character(harmony_var) | is.null(harmony_var),
         is.character(assay.use))
     
+    # Remove SCT assay at this point, therefore if it is passed it means the
+    # user passed .normalize_sct as the normalization function
+    srobj[["SCT"]] <- NULL
+    
+    # Get started with the tree building!
     tieredsrobjs <- GenTieredClusters(
         srobj = srobj,
         PreProcess_fun = .preprocess,
         min_cluster_size = min_cluster_size,
         max_tiers = max_tiers,
         ChooseOptimalClustering_fun = ChooseOptimalClustering_fun,
+        .normalize_data = .normalize_data,
         res_scan_step = res_scan_step,
         res_scan_min = res_scan_min,
         res_scan_max = res_scan_max,
@@ -85,19 +96,21 @@ ARBOL <- function(
         harmony_var = harmony_var,
         DownsampleNum = DownsampleNum)
 
-  srobjslist <- unlist(tieredsrobjs)
-  tryCatch({
-    tierNidents <- lapply(srobjslist, function(tsrobj) {
-      tryCatch({
-        idents <- data.frame(
-            CellID = row.names(tsrobj@meta.data),
-            tierNident = tsrobj@meta.data$tierNident)
-        return(idents)
-      })
-    })
-  },
-    error = function(e) {message('unnesting srobjs failed, probably because clustering failed. reason:'); print(e)}
-  )
+    srobjslist <- unlist(tieredsrobjs)
+    tryCatch({
+        tierNidents <- lapply(srobjslist, function(tsrobj) {
+            tryCatch({
+                idents <- data.frame(
+                    CellID = row.names(tsrobj@meta.data),
+                    tierNident = tsrobj@meta.data$tierNident)
+                return(idents)
+                })
+            })
+    },
+        error = function(e) {
+            message('unnesting srobjs failed, probably because clustering',
+                    ' failed. reason:'); print(e)}
+    )
 
   endclustDF <- bind_rows(tierNidents)
   endclustDF$tierNident <- sub('_T0C0_', '',endclustDF$tierNident)

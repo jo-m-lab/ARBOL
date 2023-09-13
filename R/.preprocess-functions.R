@@ -96,18 +96,15 @@
 #' @noRd
 .preprocess <- function(
         srobj,
-        .normalize = .normalize_log1p,
-        .choose_hvg = .choose_hvg_default,
-        harmony_var = NULL,
-        assay.use = DefaultAssay(srobj)) {
+        .normalize_data = .normalize_log1p,
+        harmony_var = NULL) {
     
     # Some input quality checks
     stopifnot(
         is(srobj, "Seurat"),
-        is(.normalize, "function"),
+        is(.normalize_data, "function"),
         is(.choose_hvg, "function"),
-        is.character(harmony_var) | is.null(harmony_var),
-        is.character(assay.use))
+        is.character(harmony_var) | is.null(harmony_var))
     
     # Standard data preprocessing
     srobj <- .normalize_data(object = srobj)
@@ -134,12 +131,12 @@
     }
     
     # Choose number of reduced dimensions
-    nPCs <- .choose_dims_default(srobj, reduction = reduction)
+    nDRs <- .choose_dims_default(srobj, reduction = reduction)
     
     # Save the PCs to use in misc
-    srobj@misc$nPCs <- nPCs
+    srobj@misc$nDRs <- nDRs
     message(
-        paste0("chose ", length(nPCs), "PCs, added choices to srobj@misc$nPCs"))
+        paste0("chose ", length(nDRs), "nDRs, added choices to srobj@misc$nDRs"))
     
     # Compute KNN graph
     srobj <- FindNeighbors(

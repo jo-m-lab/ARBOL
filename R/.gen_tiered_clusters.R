@@ -27,6 +27,7 @@
         min_cluster_size = 100,
         max_tiers = 10,
         ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
+        .normalize_data = .normalize_log1p,
         res_scan_step = 5,
         res_scan_min = 0.01,
         res_scan_max = 1,
@@ -45,9 +46,10 @@
     
     if (min_cluster_size < 5) {
         message(
-        'WARNING: setting minimum cluster size to < 5 will throw errors in processing functions. \n 
-        the full run should finish, but all processing of srobj < 5 cells is unreliable. \n
-        Search "failure" in logs for information')
+        'WARNING: setting minimum cluster size to < 5 will throw errors in',
+        'processing functions.\nThe full run should finish, but all processing',
+        'of srobj < 5 cells is unreliable.\n',
+        'Search "failure" in logs for information')
     }
     
     if ( (ncol(srobj) < min_cluster_size) | (srobj@misc$tier > max_tiers) ) {
@@ -55,13 +57,17 @@
             "found end-node below min number of cells or above max tier. num cells: ",
             ncol(srobj),' < ', min_cluster_size))
         #add tierNident to metadata and stop recursion
-        srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.')
+        srobj@meta.data$tierNident <- gsub('/', '.', SaveEndFileName)
         return(srobj)
     }
     
     # Preprocessing: Run SCtransform or log transform, PCA, choose num PCs for
     #  downstream analysis, find neighbors.
-    tryCatch({srobj <- PreProcess_fun(srobj, regressVar = harmony_var)
+    tryCatch({
+        srobj <- .preprocess(
+            srobj,
+            .normalize_data = .normalize_data,
+            regressVar = harmony_var)
     },
     error = function(e) {
         message('Pre-processing failure')
@@ -69,9 +75,8 @@
     })
     
     # Check if SCT ran successfully, if not, default back to log1p
-    if(!(cluster_assay %in% names(srobj@assays))){
+    if (!("SCT" %in% names(srobj@assays)))
         cluster_assay = "RNA"
-    }
     
     # Get optimum cluster resolution and cluster
     tryCatch({res <- ChooseOptimalClustering_fun(
