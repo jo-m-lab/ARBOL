@@ -29,7 +29,7 @@
 #
 #
 # examples 
-# nPCs <- ChoosePCs_default(srobj, figure_dir=fig_dir)
+# nDRs <- ChoosePCs_default(srobj, figure_dir=fig_dir)
 #' 
 #' @param srobj v4 seurat object
 #' @param improved_diff_quantile percent variance explained of next PC to choose PC
@@ -58,7 +58,7 @@
     if ((reduction == "pca" & ncol(srobj) > 500) | reduction != "pca") {
         eigValues <- (srobj[[reduction]]@stdev)^2  ## EigenValues
         varExplained <- eigValues / sum(eigValues)
-        nPCs <- 1:max(
+        nDRs <- 1:max(
             which(diff(varExplained) < 
                       quantile(diff(varExplained),
                                1 - improved_diff_quantile)) + 1)
@@ -68,23 +68,23 @@
         #Run PCA under RNA for Jackstraw
         srobj <- RunPCA(
             object = srobj,
-            npcs = min(50, round(ncol(srobj)/2)),
+            nDRs = min(50, round(ncol(srobj)/2)),
             verbose = FALSE)
         suppressWarnings({srobj <- JackStraw(srobj, dims = 50)})
         srobj <- ScoreJackStraw(
             srobj,
             dims = 1:ncol(srobj@reductions$pca@cell.embeddings))
         # Extract number of PCs
-        nPCs <- which(JS(srobj$pca)@overall.p.values[, "Score"] < significance)
+        nDRs <- which(JS(srobj$pca)@overall.p.values[, "Score"] < significance)
 
         # DefaultAssay(srobj) <- 'SCT' ## TODO related to the comment 7 lines above
     }
     
     # Set vector for corner case 2
-    if (length(nPCs) <= 2) {
-        nPCs <- seq_len(2)
+    if (length(nDRs) <= 2) {
+        nDRs <- seq_len(2)
     }
-    return(nPCs)
+    return(nDRs)
 }
 
 
@@ -103,11 +103,10 @@
     stopifnot(
         is(srobj, "Seurat"),
         is(.normalize_data, "function"),
-        is(.choose_hvg, "function"),
         is.character(harmony_var) | is.null(harmony_var))
     
     # Standard data preprocessing
-    srobj <- .normalize_data(object = srobj)
+    srobj <- .normalize_data(srobj = srobj)
     srobj <- FindVariableFeatures(
         srobj,
         nfeatures = 2000,
@@ -115,7 +114,7 @@
     srobj <- ScaleData(object = srobj, features = VariableFeatures(srobj))
     srobj <- RunPCA(
         object = srobj,
-        npcs = min(50, round(ncol(srobj) / 2)),
+        nDRs = min(50, round(ncol(srobj) / 2)),
         verbose = FALSE)
     # Specify this for the .choose_dims_default step
     reduction <- "pca"
@@ -141,7 +140,7 @@
     # Compute KNN graph
     srobj <- FindNeighbors(
         object = srobj,
-        dims = nPCs,
+        dims = nDRs,
         k.param = ceiling(0.5*sqrt(ncol(srobj))),
         reduction = reduction,
     )

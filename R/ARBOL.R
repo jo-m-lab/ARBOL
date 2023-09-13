@@ -81,6 +81,10 @@ ARBOL <- function(
     # user passed .normalize_sct as the normalization function
     srobj[["SCT"]] <- NULL
     
+    # Add cellnames as a column to metadata and only keep that one
+    srobj$CellID <- colnames(srobj)
+    srobj@meta.data <- srobj@meta.data[, "CellID", drop = FALSE]
+    
     # Get started with the tree building!
     tieredsrobjs <- GenTieredClusters(
         srobj = srobj,

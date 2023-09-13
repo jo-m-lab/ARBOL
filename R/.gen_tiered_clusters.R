@@ -9,6 +9,8 @@
 #' @param clustN integer, defines which cluster in a tier we are on.
 #'    Necessary for the recursive approach to make sure we go through all the
 #'    cluster in a tier. Starts from 0.
+#' @param id_tc NULL or character vector indicating the tier and cluster the
+#'   function is iterating on.
 #' @inheritParams ARBOL
 #' @return list of lists with all seurat objects 
 #' 
@@ -24,6 +26,7 @@
         PreProcess_fun = PreProcess_sctransform,
         tier = 0,
         clustN = 0,
+        id_tc = NULL,
         min_cluster_size = 100,
         max_tiers = 10,
         ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
@@ -39,6 +42,10 @@
     # keep track of position in tree for logging
     message("Number of cells: ", paste0(ncol(srobj), collapse = "\n"))
     message(paste0("Starting tier: ", tier, ", with ", ncol(srobj), " cells" ))
+    # ID with the tier and cluster
+    id_tc <- paste0(id_tc, sprintf("_T%sC%s", tier, clustN))
+    srobj@misc$tier <- tier
+    srobj@misc$clustN <- clustN
     
     ######################################################################################################
     # check if too few cells or past tier 10. if so, return end-node without processing
@@ -57,7 +64,7 @@
             "found end-node below min number of cells or above max tier. num cells: ",
             ncol(srobj),' < ', min_cluster_size))
         #add tierNident to metadata and stop recursion
-        srobj@meta.data$tierNident <- gsub('/', '.', SaveEndFileName)
+        srobj@meta.data$tierNident <- gsub('/', '.', id_tc)
         return(srobj)
     }
     
@@ -67,7 +74,7 @@
         srobj <- .preprocess(
             srobj,
             .normalize_data = .normalize_data,
-            regressVar = harmony_var)
+            harmony_var = harmony_var)
     },
     error = function(e) {
         message('Pre-processing failure')
@@ -94,6 +101,8 @@
         message('Resolution choice failure')
         print(paste("Resolution choice error: ", e))
     })
+    
+    # Find clusters
     tryCatch({srobj <- FindClusters(srobj, resolution = res)
     },
     error = function(e) {
@@ -106,9 +115,14 @@
     ######################################################################################################
     
     # if one cluster:
-    if ( !(length(unique(Idents(srobj))) > 1) ) {
+    ## TODO Idents doesn't seem the right approach here cause its not reset
+    # by FindClusters :suspicious_look
+    # Not happy with my approach, but it should be robust
+    res_nm <- paste0("_snn_res.", res, "$")
+    idx <- grep(res, colnames(srobj@meta.data))
+    if ( length(unique(srobj@meta.data[, idx])) == 1 ) {
         message("found end-node with one cluster")
-        srobj@meta.data$tierNident <- SaveEndFileName %>% str_replace_all('/','.')
+        srobj@meta.data$tierNident <- gsub('/', '.', id_tc)
         return(srobj)
     }
     
@@ -116,12 +130,13 @@
     # recurse
     ######################################################################################################
     
+    ## TODO revisit this step, do we need to split by Idents with this
+    # function or can we use SplitObject from Seurat?
     # split all clusters into separate srobjs
     message("continuing to recurse")
-    
+    Idents(srobj) <- srobj@meta.data[, idx]
     subsets <- SplitSrobjOnIdents(srobj, paste0("tier", tier))
     
-    print(subsets)
     # recurse along subsets
     return(lapply(seq_along(subsets),
                   function(i) {
