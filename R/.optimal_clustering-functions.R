@@ -34,11 +34,9 @@
         srobj <- .preprocess(srobj, harmony_var = harmony_var)
     }
     #setting resolution choice to arbitrary number in case of error
-    ndrsave <- srobj@misc$nDRs # TODO is this needed?
-    srobj@misc$resolution.choice <- 1
-    srobj@misc <- list("resolution.choice" = resolution.choice)
+    resolution.choice <- 1
     
-    tryCatch( { srobj <- .choose_resolution_silhouette_scan(srobj, ...)
+    tryCatch( { resolution.choice <- .choose_resolution_silhouette_scan(srobj, ...)
     }, error = function(e) {
         message('Harmony Silhouette Analysis failed. resolution set to 1.',
                 ' WARNING: Double check your result.')
@@ -48,6 +46,6 @@
 
     
     
-    return(srobj@misc$resolution.choice)
+    return(resolution.choice)
     
 }
