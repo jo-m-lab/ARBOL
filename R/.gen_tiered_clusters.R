@@ -31,6 +31,7 @@
         res_scan_min = 0.01,
         res_scan_max = 1,
         res_scan_n = 40,
+        reduction = "pca",
         harmony_var = NULL,
         DownsampleNum = 7500) {
     

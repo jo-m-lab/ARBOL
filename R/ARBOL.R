@@ -46,7 +46,7 @@
 #' 
 ARBOL <- function(
         srobj,
-        PreProcess_fun = PreProcess_sctransform,
+        .normalize = .normalize_log1p,
         min_cluster_size = 100,
         max_tiers = 10,
         ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
@@ -56,19 +56,34 @@ ARBOL <- function(
         res_scan_n = 40,
         harmony_var = NULL,
         DownsampleNum = 7500) {
-
-  tieredsrobjs <- GenTieredClusters(
-      srobj = srobj,
-      PreProcess_fun = PreProcess_fun,
-      min_cluster_size = min_cluster_size,
-      max_tiers = max_tiers,
-      ChooseOptimalClustering_fun = ChooseOptimalClustering_fun,
-      res_scan_step = res_scan_step,
-      res_scan_min = res_scan_min,
-      res_scan_max = res_scan_max,
-      res_scan_n = res_scan_n,
-      harmony_var = harmony_var,
-      DownsampleNum = DownsampleNum)
+    
+    # Some input quality checks
+    stopifnot(
+        is(srobj, "Seurat"),
+        is(.normalize, "function"),
+        is(ChooseOptimalClustering_fun, "function"),
+        is.numeric(min_cluster_size) & length(min_cluster_size) == 1,
+        is.numeric(max_tiers) & length(max_tiers) == 1,
+        is.numeric(res_scan_step) & length(res_scan_step) == 1,
+        is.numeric(res_scan_min) & length(res_scan_min) == 1,
+        is.numeric(res_scan_max) & length(res_scan_max) == 1,
+        is.numeric(res_scan_n) & length(res_scan_n) == 1,
+        is.numeric(DownsampleNum) & length(DownsampleNum) == 1,
+        is.character(harmony_var) | is.null(harmony_var),
+        is.character(assay.use))
+    
+    tieredsrobjs <- GenTieredClusters(
+        srobj = srobj,
+        PreProcess_fun = .preprocess,
+        min_cluster_size = min_cluster_size,
+        max_tiers = max_tiers,
+        ChooseOptimalClustering_fun = ChooseOptimalClustering_fun,
+        res_scan_step = res_scan_step,
+        res_scan_min = res_scan_min,
+        res_scan_max = res_scan_max,
+        res_scan_n = res_scan_n,
+        harmony_var = harmony_var,
+        DownsampleNum = DownsampleNum)
 
   srobjslist <- unlist(tieredsrobjs)
   tryCatch({
