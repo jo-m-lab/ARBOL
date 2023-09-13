@@ -44,12 +44,14 @@
     #     random.cells.choose <- seq_len(nrow(dist.temp))
     # }
         
-    dist.temp <- cor(t(srobj.tmp@reductions$harmony@cell.embeddings[, n.drs]), method = "pearson")
+    dist.temp <- cor(t(srobj.tmp@reductions$harmony@cell.embeddings[, n.drs]),
+                     method = "pearson")
     # dist.temp <- dist.temp[random.cells.choose, random.cells.choose]
     sil.all.matrix <- matrix(data = NA, nrow = nrow(dist.temp), ncol = res.n)
     
     # set up empty additive data structures for silhouette scan
-    set.res <- round(exp(seq(log(res.low), log(res.high), length.out = res.n)), digits=3)
+    set.res <- round(exp(seq(log(res.low), log(res.high), length.out = res.n)),
+                     digits = 3)
     res.that.work <- rep(TRUE, length(set.res))
     
     ######## step 2: calculate the FindClusters over a large range of resolutions
@@ -62,8 +64,13 @@
         # tryCatch allows testing resolutions that might cause errors in algorithm
         tryCatch({
             srobj.tmp <- FindClusters(srobj.tmp, resolution = set.res[i], verbose = FALSE)
-        }, error = function(e) {res.that.work[i] <<- FALSE; message(paste("errored on", set.res[i], "flagging that resolution as it doesn't work"))})
-        print(paste("          ", round(100*i/length(set.res)), "% done with parameter scan", sep=""))
+        }, error = function(e) {
+            res.that.work[i] <<- FALSE
+            message(
+                paste("errored on", set.res[i],
+                      "flagging that resolution as it doesn't work"))})
+        print(paste("          ", round(100*i/length(set.res)),
+                    "% done with parameter scan", sep=""))
         #if an error is encountered, skip this resolution and don't add it to the testing matrix
         if (res.that.work[i] == FALSE) {
             next

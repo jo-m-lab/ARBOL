@@ -78,7 +78,7 @@
     if (!("SCT" %in% names(srobj@assays)))
         cluster_assay = "RNA"
     
-    # Get optimum cluster resolution and cluster
+    # Get optimal cluster resolution for clustering
     tryCatch({res <- ChooseOptimalClustering_fun(
         srobj,
         PreProcess_fun = PreProcess_fun,

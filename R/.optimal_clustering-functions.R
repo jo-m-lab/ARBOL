@@ -38,22 +38,14 @@
     srobj@misc$resolution.choice <- 1
     srobj@misc <- list("resolution.choice" = resolution.choice)
     
-    if (!is.null(harmony_var)) {
-        tryCatch( { srobj <- chooseResolution_SilhouetteAnalysisParameterScan_harmony(srobj, ...)
-        }, error = function(e) {
-            message('Harmony Silhouette Analysis failed. resolution set to 1.',
-                    ' WARNING: Double check your result.')
-            message(paste("Harmony Silhouette Analysis error: ", e))
-        })
-    }
-    else {
-        tryCatch({srobj <- chooseResolution_SilhouetteAnalysisParameterScan(srobj, ...)
-        }, error = function(e) {
-            message('Silhouette Analysis failed. resolution set to 1.',
-                    ' WARNING: Double check your result.')
-            message(paste("Silhouette Analysis error: ", e))
-        })
-    }
+    tryCatch( { srobj <- .choose_resolution_silhouette_scan(srobj, ...)
+    }, error = function(e) {
+        message('Harmony Silhouette Analysis failed. resolution set to 1.',
+                ' WARNING: Double check your result.')
+        message(paste("Harmony Silhouette Analysis error: ", e))
+    })
+    
+
     
     
     return(srobj@misc$resolution.choice)
