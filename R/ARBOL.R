@@ -25,7 +25,6 @@
 #' @param DownsampleNum integer, number of cells to downsample to when running
 #'  the silhouette scan.
 #' @return dataframe with tierN cluster membership per cell
-#' @export
 #' 
 #' @details
 #' ARBOL aims to obtain tiered hierarchical clustering of all the cells in the
@@ -53,7 +52,7 @@ ARBOL <- function(
         ChooseOptimalClustering_fun = ChooseOptimalClustering_default,
         res_scan_step = 5,
         res_scan_min = 0.01,
-        res_scan_max = 3,
+        res_scan_max = 1,
         res_scan_n = 40,
         harmony_var = NULL,
         DownsampleNum = 7500) {
