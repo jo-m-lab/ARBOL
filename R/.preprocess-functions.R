@@ -2,11 +2,14 @@
 ## ARBOL supported normalization functions ##
 #############################################
 #' @noRd
+#' @importFrom Seurat NormalizeData
+
 .normalize_log1p <- function(srobj) {
     NormalizeData(object = srobj, verbose = FALSE)
     }
 
 #' @noRd
+#' @importFrom Seurat SCTransform
 .normalize_sct <- function(srobj) {
     SCTransform(object = srobj, verbose = FALSE, method = "glmGamPoi")
     }
@@ -58,22 +61,23 @@
     if ((reduction == "pca" & ncol(srobj) > 500) | reduction != "pca") {
         eigValues <- (srobj[[reduction]]@stdev)^2  ## EigenValues
         varExplained <- eigValues / sum(eigValues)
-        nDRs <- 1:max(
-            which(diff(varExplained) < 
-                      quantile(diff(varExplained),
-                               1 - improved_diff_quantile)) + 1)
+        nDRs <- 1:max(which(
+            diff(varExplained) <
+                quantile(diff(varExplained), 1 - improved_diff_quantile)) + 1)
     } else {
         # Change default assay to run PCA on RNA
-        # DefaultAssay(srobj) <- 'RNA' ## TODO Is this needed? We can run JackStraw on any normalized data
+        DefaultAssay(srobj) <- "RNA" # JackStraw cannot be run on SCTransform-normalized data
         #Run PCA under RNA for Jackstraw
+        npcs <- min(50, round(ncol(srobj)/2))
         srobj <- RunPCA(
             object = srobj,
-            nDRs = min(50, round(ncol(srobj)/2)),
+            npcs = npcs,
+            assay = "RNA",
             verbose = FALSE)
-        suppressWarnings({srobj <- JackStraw(srobj, dims = 50)})
+        suppressWarnings({srobj <- JackStraw(srobj, dims = npcs, assay = "RNA")})
         srobj <- ScoreJackStraw(
             srobj,
-            dims = 1:ncol(srobj@reductions$pca@cell.embeddings))
+            dims = 1:ncol(srobj[["pca"]]@cell.embeddings))
         # Extract number of PCs
         nDRs <- which(JS(srobj$pca)@overall.p.values[, "Score"] < significance)
 
@@ -93,6 +97,7 @@
 ####################################
 # Helper function to process the seurat object at each step
 #' @importFrom Seurat FindVariableFeatures ScaleData RunPCA FindNeighbors
+#' @importFrom harmony RunHarmony
 #' @noRd
 .preprocess <- function(
         srobj,
@@ -110,21 +115,28 @@
     srobj <- FindVariableFeatures(
         srobj,
         nfeatures = 2000,
-        selection.method = "disp")
-    srobj <- ScaleData(object = srobj, features = VariableFeatures(srobj))
+        selection.method = "disp",
+        verbose = FALSE)
+    srobj <- ScaleData(
+        object = srobj,
+        features = VariableFeatures(srobj),
+        verbose = FALSE)
     srobj <- RunPCA(
         object = srobj,
-        nDRs = min(50, round(ncol(srobj) / 2)),
+        npcs = min(50, round(ncol(srobj) / 2)),
         verbose = FALSE)
     # Specify this for the .choose_dims_default step
     reduction <- "pca"
     
     # Run Harmony integration if specified
     if (!is.null(harmony_var)) {
-        srobj <- RunHarmony(
-            object = srobj,
-            group.by.vars = harmony_var,
-            reduction = "pca")
+        suppressWarnings(
+            srobj <- RunHarmony(
+                object = srobj,
+                group.by.vars = harmony_var,
+                reduction = "pca")
+        )
+        
         # Specify this for the .choose_dims_default step
         reduction <- "harmony"
     }
