@@ -515,44 +515,44 @@ centroidTaxonomy <- function(srobj, tree_reduction = 'centroids', hclust_method 
 #'                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 #' @export
 getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {
+                         centroid_method = "mean", centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {
 
+    # Convert the centroid_method string to a function
+    if (is.character(centroid_method)) {
+        centroid_method_func <- match.fun(centroid_method)
+    } else {
+        stop("centroid_method should be a string representing an aggregation function.")
+    }
+  
     srobj_meta <- srobj@meta.data
+    
     if (tree_reduction %in% names(srobj@reductions)) {
-      scaled.data.mtx <- Embeddings(srobj, reduction=tree_reduction)[,reduction_dims]
+        scaled.data.mtx <- Embeddings(srobj, reduction=tree_reduction)[, reduction_dims]
+    } else {
+        gene_list <- match(gene_list, rownames(srobj[[centroid_assay]]@data))
+        gene_list <- gene_list[!is.na(gene_list)]
+        submtx <- srobj[[centroid_assay]]@data[gene_list,]
+        scaled.data.mtx <- Matrix(t(as.matrix(submtx)), sparse=TRUE)
     }
-    else {
-      gene_list = match(gene_list,rownames(srobj[[centroid_assay]]@data))
-      gene_list <- gene_list[!is.na(gene_list)]
-      submtx <- srobj[[centroid_assay]]@data[gene_list,]
-      scaled.data.mtx <- Matrix(t(as.matrix(submtx)),sparse=TRUE)
-    }
-        #pull seurat object's cell ID + tierNident
-    t2 <- srobj_meta[,c('CellID','tierNident')]
-    #create numerical representation of tierNident per ident 
-    t3 <- data.frame(tierNident=t2$tierNident %>% unique,i = seq(1:length(unique(t2$tierNident))))
-    #place numerical representation in cell matrix t2
-    t2$i <- match(t2$tierNident,t3$tierNident) %>% as.double
-    #turn numerical representation matrix of tierNident to a sparse matrix
-    t4 <- Matrix(t2 %>% dplyr::select(i) %>% unlist,sparse=TRUE)
-    #add numerical representation of tierNident to a sparse matrix of actual data (to allow aggregation)
-    scaled.data.t <- cbind(t4,scaled.data.mtx)
 
-    #remember rownames
-    rows = row.names(scaled.data.t)
+    t2 <- srobj_meta[, c('CellID', 'tierNident')]
+    t3 <- data.frame(tierNident = unique(t2$tierNident), i = seq_along(unique(t2$tierNident)))
+    t2$i <- as.double(match(t2$tierNident, t3$tierNident))
+    t4 <- Matrix(unlist(dplyr::select(t2, i)), sparse=TRUE)
 
-    #aggregate sparse matrix by cluster, taking 'centroid_method' of each gene per cluster
-    agg.clst.cntrs<- Matrix.utils::aggregate.Matrix(scaled.data.t[rows,-1],groupings=scaled.data.t[rows,1,drop=FALSE],fun=centroid_method)
-    clst.cntrs <- agg.clst.cntrs
+    scaled.data.t <- cbind(t4, scaled.data.mtx)
+    rows <- row.names(scaled.data.t)
 
-    #transpose cluster centers dataframe
-    g <- clst.cntrs %>% as.matrix %>% t %>% data.frame
+    # Using efficient_dgcMatrix_aggregator for aggregation
+    clst.cntrs <- efficient_dgcMatrix_aggregator(scaled.data.t[rows, -1], as.numeric(scaled.data.t[rows, 1, drop=FALSE]), centroid_method_func)
 
-    #remember actual tierNident names
+    g <- as.data.frame(t(as.matrix(clst.cntrs)))
     colnames(g) <- t3$tierNident
-    return(g)
 
+    return(g)
 }
+
+
 
 #' Creates binary tree object for ARBOL run, adds it to seurat object along with a graph of it
 #' calls centroidTaxonomy() in which assay + methods for tree building are called
@@ -1346,3 +1346,77 @@ feature_zscore <- function(srobj, feature, assay) {
 }
 
 
+#' Combine Sparse Vectors into a Sparse Matrix
+#' from https://stackoverflow.com/questions/8843700/creating-sparse-matrix-from-a-list-of-sparse-vectors
+#' This function takes a list of sparse vectors and combines them into a single sparse matrix.
+#' The vectors in the list must all have the same length.
+#'
+#' @param input_list List of sparse vectors of class "dsparseVector".
+#' 
+#' @return A sparse matrix of class "dgCMatrix".
+#' @examples
+#' vec1 <- sparseVector(c(1, 2), c(1, 2))
+#' vec2 <- sparseVector(c(3), c(2))
+#' sv.cbind(list(vec1, vec2))
+#' @export
+sv.cbind <- function (input_list) {
+    input <- lapply(input_list, as, "dsparseVector")
+    thelength <- unique(sapply(input, length))
+    stopifnot(length(thelength) == 1)
+
+    return(sparseMatrix(
+        x = unlist(lapply(input, slot, "x")),
+        i = unlist(lapply(input, slot, "i")),
+        p = c(0, cumsum(sapply(input, function(x) {length(x@x)}))),
+        dims = c(thelength, length(input))
+    ))
+}
+
+#' Efficient Aggregation of dgCMatrix Columns
+#'
+#' This function efficiently aggregates the columns of a sparse matrix (dgCMatrix) based on a given grouping vector.
+#' Various aggregation functions can be applied (e.g., mean, sum, median).
+#'
+#' @param mat A matrix of class "dgCMatrix" to be aggregated.
+#' @param groupings A numeric vector specifying the group for each row in `mat`.
+#' @param aggregation_function A function to aggregate the groups. E.g., mean, sum, median.
+#' 
+#' @return A sparse matrix of class "dgCMatrix" with aggregated columns.
+#' @examples
+#' mat <- Matrix(c(1, 0, 2, 0, 0, 3), nrow = 3, sparse = TRUE)
+#' groups <- c(1, 1, 2)
+#' efficient_dgcMatrix_aggregator(mat, groups, mean)
+#' @export
+efficient_dgcMatrix_aggregator <- function(mat, groupings, aggregation_function) {
+    unique_groups <- unique(groupings)
+    num_unique_groups <- length(unique_groups)
+
+    # Placeholder for the final matrix
+    aggregated_columns <- vector('list', ncol(mat))
+
+    for (j in seq_len(ncol(mat))) {
+        # Extract a sparse column vector
+        col_data <- mat[, j, drop = FALSE]
+
+        group_values <- split(col_data@x, factor(groupings[col_data@i + 1], levels = unique_groups))
+        aggregated_values <- sapply(group_values, aggregation_function, simplify = "numeric")
+
+        # Indices of non-zero entries
+        non_zero_indices <- which(!is.na(aggregated_values) & aggregated_values != 0)
+
+        # Create sparse vector
+        aggregated_vector <- sparseVector(
+          x = aggregated_values[non_zero_indices],
+          i = non_zero_indices,
+          length = num_unique_groups
+        )
+
+        aggregated_columns[[j]] <- aggregated_vector
+    }
+
+    # Then, within efficient_dgcMatrix_aggregator:
+    aggregated_mat <- sv.cbind(aggregated_columns)
+
+
+    return(aggregated_mat)
+}

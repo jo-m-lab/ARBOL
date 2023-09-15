@@ -9,7 +9,7 @@ getCentroids(
   srobj = srobj,
   tree_reduction = tree_reduction,
   reduction_dims = reduction_dims,
-  centroid_method = centroid_method,
+  centroid_method = "mean",
   centroid_assay = centroid_assay,
   gene_list = rownames(srobj[["RNA"]]@data)
 )
