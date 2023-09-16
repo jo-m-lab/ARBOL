@@ -1452,7 +1452,7 @@ ARBOL.Aggregate = function(node,
                      if (length(v) > 0) {
                        if (!is.na(v[1])) return(v)
                      }
-                     Aggregate(x, attribute, aggFun, ...)
+                     ARBOL.Aggregate(x, attribute, aggFun, ...)
                    })
   result <- unname(aggFun(values))
 
