@@ -374,7 +374,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #propagate totals variables up tree by summing the end-nodes
     if(is.character(total_attributes)) {
       for (y in total_attributes){
-        ARBOLtree$Do(function(node) node[[y]] <- data.tree::Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+        ARBOLtree$Do(function(node) node[[y]] <- ARBOL.aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
       }
     }
 
@@ -384,7 +384,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
             uniqs <- unique(srobj@meta.data[[y]])
             attrs = sprintf('%s_n_%s',y,uniqs)
             for (attr in attrs) {
-                ARBOLtree$Do(function(node) node[[attr]] <- data.tree::Aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
+                ARBOLtree$Do(function(node) node[[attr]] <- ARBOL.aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
             }            
         }
     }
@@ -393,9 +393,9 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #https://www.r-bloggers.com/2022/04/new-features-in-r-4-2-0/
     suppressWarnings({
     #propagate list of cell barcodes per node up the tree
-      ARBOLtree$Do(function(node) node[['ids']] <- data.tree::Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['ids']] <- ARBOL.aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
       #also samples. introducing this line to the function enforces "sample" column in srobj metadata
-      ARBOLtree$Do(function(node) node[['samples']] <- data.tree::Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['samples']] <- ARBOL.aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
     })
 
     #propagate additional categorical variables
@@ -1419,4 +1419,42 @@ efficient_dgcMatrix_aggregator <- function(mat, groupings, aggregation_function)
 
 
     return(aggregated_mat)
+}
+
+#' ARBOL Aggregate Function
+#'
+#' This function recursively traverses a node tree to aggregate attribute values.
+#'
+#' @param node A node in the tree. Can be either a leaf or a parent node.
+#' @param attribute The attribute that should be used for aggregation.
+#' @param aggFun The function used for aggregating the attribute values. This function should take a vector and return a single value.
+#' @param ... Additional arguments to pass to GetAttribute().
+#'
+#' @return Returns the aggregated attribute value.
+#' @export
+#'
+#' @examples
+#' # Assuming 'treeRoot' is the root of your tree and 'sum' is your aggregation function
+#' ARBOL.Aggregate(treeRoot, "height", sum)
+#'
+#' @note The 'cacheAttribute' argument is deprecated. Please use 'Do' instead.
+ARBOL.Aggregate = function(node,
+                     attribute,
+                     aggFun,
+                     ...) {
+
+  if("cacheAttribute" %in% names(list(...))) stop("cacheAttribute not supported anymore! Please use Do instead.")
+
+  if (isLeaf(node)) return ( GetAttribute(node, attribute, ...) )
+  values <- sapply(node$children,
+                   function(x) {
+                     v <- GetAttribute(x, attribute, format = identity, ...)
+                     if (length(v) > 0) {
+                       if (!is.na(v[1])) return(v)
+                     }
+                     Aggregate(x, attribute, aggFun, ...)
+                   })
+  result <- unname(aggFun(values))
+
+  return (result)
 }
