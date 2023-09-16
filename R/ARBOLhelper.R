@@ -374,7 +374,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #propagate totals variables up tree by summing the end-nodes
     if(is.character(total_attributes)) {
       for (y in total_attributes){
-        ARBOLtree$Do(function(node) node[[y]] <- ARBOL.aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
+        ARBOLtree$Do(function(node) node[[y]] <- ARBOL.Aggregate(node, attribute = y, aggFun = sum), traversal = "post-order")
       }
     }
 
@@ -384,7 +384,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
             uniqs <- unique(srobj@meta.data[[y]])
             attrs = sprintf('%s_n_%s',y,uniqs)
             for (attr in attrs) {
-                ARBOLtree$Do(function(node) node[[attr]] <- ARBOL.aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
+                ARBOLtree$Do(function(node) node[[attr]] <- ARBOL.Aggregate(node, attribute = attr, aggFun = sum), traversal = "post-order")
             }            
         }
     }
@@ -393,9 +393,9 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #https://www.r-bloggers.com/2022/04/new-features-in-r-4-2-0/
     suppressWarnings({
     #propagate list of cell barcodes per node up the tree
-      ARBOLtree$Do(function(node) node[['ids']] <- ARBOL.aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['ids']] <- ARBOL.Aggregate(node, attribute = 'ids', aggFun = c), traversal = "post-order")
       #also samples. introducing this line to the function enforces "sample" column in srobj metadata
-      ARBOLtree$Do(function(node) node[['samples']] <- ARBOL.aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
+      ARBOLtree$Do(function(node) node[['samples']] <- ARBOL.Aggregate(node, attribute = 'samples', aggFun = c), traversal = "post-order")
     })
 
     #propagate additional categorical variables
