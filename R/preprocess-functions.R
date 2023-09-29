@@ -70,11 +70,11 @@
         DefaultAssay(srobj) <- "RNA" # JackStraw cannot be run on SCTransform-normalized data
         #Run PCA under RNA for Jackstraw
         npcs <- min(50, round(ncol(srobj)/2))
-        srobj <- RunPCA(
+        suppressWarnings(srobj <- RunPCA(
             object = srobj,
             npcs = npcs,
             assay = "RNA",
-            verbose = FALSE)
+            verbose = FALSE))
         # TODO this is the most computationally expensive step even if only run when n cells <500
         suppressWarnings({srobj <- JackStraw(srobj, dims = npcs, assay = "RNA")})
         srobj <- ScoreJackStraw(
@@ -123,10 +123,10 @@
         object = srobj,
         features = VariableFeatures(srobj),
         verbose = FALSE)
-    srobj <- RunPCA(
+    suppressWarnings(srobj <- RunPCA(
         object = srobj,
         npcs = min(50, round(ncol(srobj) / 2)),
-        verbose = FALSE)
+        verbose = FALSE))
     # Specify this for the .choose_dims_default step
     reduction <- "pca"
     
