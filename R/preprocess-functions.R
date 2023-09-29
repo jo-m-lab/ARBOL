@@ -61,6 +61,7 @@
     if ((reduction == "pca" & ncol(srobj) > 500) | reduction != "pca") {
         eigValues <- (srobj[[reduction]]@stdev)^2  ## EigenValues
         varExplained <- eigValues / sum(eigValues)
+        # TODO explain with comment here
         nDRs <- 1:max(which(
             diff(varExplained) <
                 quantile(diff(varExplained), 1 - improved_diff_quantile)) + 1)
@@ -74,6 +75,7 @@
             npcs = npcs,
             assay = "RNA",
             verbose = FALSE)
+        # TODO this is the most computationally expensive step even if only run when n cells <500
         suppressWarnings({srobj <- JackStraw(srobj, dims = npcs, assay = "RNA")})
         srobj <- ScoreJackStraw(
             srobj,
@@ -136,14 +138,12 @@
                 group.by.vars = harmony_var,
                 reduction = "pca")
         )
-        
         # Specify this for the .choose_dims_default step
         reduction <- "harmony"
     }
     
     # Choose number of reduced dimensions
     nDRs <- .choose_dims_default(srobj, reduction = reduction)
-    
     # Save the PCs to use in misc
     srobj@misc$nDRs <- nDRs
     message(
@@ -155,7 +155,7 @@
         dims = nDRs,
         k.param = ceiling(0.5*sqrt(ncol(srobj))),
         reduction = reduction,
+        verbose = FALSE
     )
-    
     return(srobj)
 }
