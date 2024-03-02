@@ -11,16 +11,17 @@ centroidTaxonomy_noSeurat(
   hclust_method = "complete",
   distance_method = "euclidean",
   centroid_method = "mean",
+  centroid_layer = "scale.data",
   centroid_assay = "SCT",
   reduction_dims = 1:25,
-  gene_list = rownames(srobj[["RNA"]]@data),
+  gene_list = Features(srobj),
   nboot = 1
 )
 }
 \arguments{
 \item{srobj}{a seurat object with ARBOL 'tierNident' column}
 
-\item{tree_reduction}{either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj}
+\item{tree_reduction}{either 'centroids', which calculates centroids among all genes, or any reduction layer in srobj}
 
 \item{hclust_method}{any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'}
 
@@ -32,7 +33,7 @@ currently, sum, count, mean, and median are supported}
 
 \item{centroid_assay}{if using cell x gene data (not any srobj@reduction), the assay within which to calculate centroids}
 
-\item{reduction_dims}{the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25}
+\item{reduction_dims}{the dimensions of the reduction layer to use for centroid calculation. defaults to 1:25}
 
 \item{gene_list}{if using cell x gene data (not any srobj@reduction), genes to include in centroid calculation. passes to getCentroids}
 }

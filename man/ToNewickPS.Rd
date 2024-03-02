@@ -16,6 +16,6 @@ Newick format tree
 data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names.
 }
 \examples{
-txt <- ToNewickPS(divtree)
+txt <- ToNewickPS(dataTree)
 ARBOLphylo <- ape::read.tree(text=txt)
 }

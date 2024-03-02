@@ -12,7 +12,7 @@ feature_zscore(srobj, feature, assay)
 
 \item{feature}{The name of the feature whose expression values are to be z-scored.}
 
-\item{assay}{The name of the assay slot where the data resides. default: RNA}
+\item{assay}{The name of the assay layer where the data resides. default: RNA}
 }
 \value{
 The updated graph object with the added mean z-scores for the given feature per node.

@@ -11,7 +11,7 @@ so that new endclusters are treated as leaf nodes}
 mergeEndclusts(srobj, sample_diversity_threshold, size_threshold)
 }
 \arguments{
-\item{srobj}{a seurat object with a binarytree calculated in slot srobj@misc$taxTree, 
+\item{srobj}{a seurat object with a binarytree calculated in layer srobj@misc$taxTree, 
 typically calculated using ARBOLcentroidTaxonomy}
 
 \item{sample_diversity_threshold}{sample diversity below which to prune nodes from tree}

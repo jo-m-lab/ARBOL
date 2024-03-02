@@ -10,8 +10,9 @@ getCentroids(
   tree_reduction = tree_reduction,
   reduction_dims = reduction_dims,
   centroid_method = "mean",
-  centroid_assay = centroid_assay,
-  gene_list = rownames(srobj[["RNA"]]@data)
+  centroid_assay = "RNA",
+  centroid_layer = "scale.data",
+  gene_list = Features(srobj)
 )
 }
 \arguments{
@@ -19,7 +20,7 @@ getCentroids(
 
 \item{tree_reduction}{cell x gene reduction space to work from. 'centroids' uses full cell x gene.}
 
-\item{reduction_dims}{the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25}
+\item{reduction_dims}{the dimensions of the reduction layer to use for centroid calculation. defaults to 1:25}
 
 \item{centroid_method}{function to calculate gene centroids per ARBOL end cluster, see Matrix.utils::aggregate.Matrix for options}
 

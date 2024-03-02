@@ -24,6 +24,6 @@ dendrogram object
 data.tree to ggraph object conversion with custom Node -> dend object conversion function that uses pathString as node names.
 }
 \examples{
-txt <- ToNewickPS(divtree)
+txt <- ToNewickPS(dataTree)
 ARBOLphylo <- ape::read.tree(text=txt)
 }

@@ -18,8 +18,8 @@ Converts data.tree object to dataframe with row per node, this function aids con
 Used in ARBOL workflow to create a tbl_graph object, a class useful for plotting dendrograms
 }
 \examples{
-ARBOLdf <- allotedTreeToDF(divtree)
-txt <- ARBOL::ToNewickPS(divtree)
+ARBOLdf <- allotedTreeToDF(dataTree)
+txt <- ARBOL::ToNewickPS(dataTree)
 ARBOLphylo <- ape::read.tree(text=txt)
 
 x <- as_tbl_graph(ARBOLphylo, directed=T) \%>\% activate(nodes) \%>\% 

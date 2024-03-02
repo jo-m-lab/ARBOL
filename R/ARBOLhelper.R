@@ -4,7 +4,7 @@
 #' @param node A data tree object
 #' @return Newick format tree
 #' @examples
-#' txt <- ToNewickPS(divtree)
+#' txt <- ToNewickPS(dataTree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' @export
 #' Functions for data.tree to phyloseq object conversion with custom ToNewick function that uses pathString as node names. This is useful when node names are redundant throughout a tree, which happens in binary tree calculation with pvclust
@@ -39,13 +39,48 @@ ToNewickPS <- function(node, heightAttribute = DefaultPlotHeight, ...) {
   
 }
 
-#Very slow, conversion through Newick format
+#' Convert data.tree Node to ape phylo Object through Newick Format
+#' This function converts a data.tree node to a phylogenetic tree (`phylo`)
+#' object from the `ape` package by first converting the data.tree to a Newick
+#' string format. This method is slower compared to direct conversion methods,
+#' but may be useful if ape or data.tree make updates that make other methods 
+#' incompatible
+#' @param x A data.tree node to be converted.
+#' @param heightAttribute The attribute used to define the height of the nodes
+#'        in the resulting phylo object. Defaults to 'DefaultPlotHeight'.
+#' @param ... Additional arguments passed to `ape::read.tree`.
+#'
+#' @return A phylo object representing the phylogenetic tree.
+#' @importFrom ape read.tree
+#' @export
+#' @examples
+#' # Assuming `myTree` is a data.tree Node
+#' phylo_tree <- as.phylo.NodeNW(myTree)
+#' plot(phylo_tree)
 as.phylo.NodeNW <- function(x, heightAttribute = DefaultPlotHeight, ...) {
   txt <- ToNewickPS(x, heightAttribute)
   return (ape::read.tree(text = txt))
 }
 
-#fast data.tree.Node to ape tree object conversion
+#' Fast Conversion of data.tree Node to ape Phylo Object
+#'
+#' Efficiently converts a data.tree node to a phylogenetic tree (`phylo`) object
+#' from the `ape` package via manipulation of an intermediate dendrogram object.
+#' Slashes from data.tree must be replaced with .
+#' in PS version, pathString is used to name nodes. 
+#'
+#' @param x A data.tree node to be converted.
+#' @param heightAttribute The attribute used to define the height of the nodes
+#'        in the resulting phylo object. Defaults to 'plotHeight'.
+#'
+#' @return A phylo object representing the phylogenetic tree, with appropriately
+#'         named nodes.
+#' @importFrom ape as.phylo
+#' @export
+#' @examples
+#' # Assuming `myTree` is a data.tree Node
+#' phylo_tree <- as.phylo.NodePS(myTree)
+#' plot(phylo_tree)
 as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
   datadend <- as.dendrogram.NodePS(x, heightAttribute = heightAttribute)
   order.dendrogram(datadend) <- seq(1,length(na.omit(get_nodes_attr(datadend, "label"))))
@@ -55,7 +90,25 @@ as.phylo.NodePS <- function(x, heightAttribute = 'plotHeight') {
   return(result)
 }
 
-#data.tree.Node to ape tree object conversion with internal nodes named by pathString and leaf nodes named without pathString (only endname)
+#' Fast Conversion of data.tree Node to ape Phylo Object
+#'
+#' Efficiently converts a data.tree node to a phylogenetic tree (`phylo`) object
+#' from the `ape` package via manipulation of an intermediate dendrogram object.
+#' Slashes from data.tree must be replaced with .
+#' in I version, internal nodes are named with pathString but leaf nodes have only leaf name
+#'
+#' @param x A data.tree node to be converted.
+#' @param heightAttribute The attribute used to define the height of the nodes
+#'        in the resulting phylo object. Defaults to 'plotHeight'.
+#'
+#' @return A phylo object representing the phylogenetic tree, with internal nodes
+#'         named by their `pathString` and leaf nodes named by their end name.
+#' @importFrom ape as.phylo
+#' @export
+#' @examples
+#' # Assuming `myTree` is a data.tree Node
+#' phylo_tree <- as.phylo.NodeI(myTree)
+#' plot(phylo_tree)
 as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
   result = as.phylo.Node(x)
   result$node.label <- allotedTreeToDF(x,'pathString','isLeaf') %>% filter(!isLeaf) %>% pull(pathString) %>% str_replace_all('/','.')
@@ -68,11 +121,10 @@ as.phylo.NodeI <- function(x, heightAttribute = 'plotHeight') {
 #' @param heightAttribute plot height attribute. Default is plotHeight
 #' @return dendrogram object
 #' @examples
-#' txt <- ToNewickPS(divtree)
+#' txt <- ToNewickPS(dataTree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' @export
 #' Functions for data.tree to dendrogram object conversion using Node pathString as node names. This is useful when node names are redundant throughout a tree, which happens in taxonomy calculation with pvclust
-
 as.dendrogram.NodePS <- function(object, heightAttribute = 'plotHeight', edgetext = FALSE,
                                namefield = 'pathString', ...) {
   node <- object
@@ -112,6 +164,7 @@ as.dendrogram.NodePS <- function(object, heightAttribute = 'plotHeight', edgetex
 #' @param folder R ARBOL endclusts folder
 #' @param maxtiers max_tiers parameter used in ARBOL
 #' @return dataframe with tier membership per cell including tierNident, the endcluster for that cell. cell barcode column CellID
+#' @importFrom dplyr filter select mutate left_join
 #' @examples
 #' tiers <- LoadTiersAsDF(folder='./endclusts',maxtiers=10)
 #' #metadata from Seurat object
@@ -137,6 +190,9 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
 #' @param group groups column for which to calculate diversity
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return dataframe with species and diversity columns
+#' @importFrom dplyr filter select mutate left_join
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' dataframe <- dataframe %>% 
 #'              left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
@@ -157,7 +213,7 @@ diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') 
     #calculate fraction of sample per species
     tierNcount <- tierNcount %>% mutate(presence = n/nums)
     #Pivot table to allow vegan::diversity call
-    tierNwide <- tierNcount %>% dplyr::select(-presence,-nums) %>% pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
+    tierNwide <- tierNcount %>% dplyr::select(-presence,-nums) %>% tidyr::pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
     #rownames are necessary, here hacking rownames from enquo with alphanumeric gsub
     tierNwide <- tierNwide %>% column_to_rownames(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""))
     #NA to 0 necessary for vegan::diversity
@@ -174,29 +230,27 @@ diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') 
 #' @param group groups column for which to calculate diversity
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return a list of diversity per group per cell
+#' @importFrom dplyr filter select mutate left_join
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' in a data tree
-#' node[[sprintf('%s_diversity',y)]] <- SIperIDs(metadata, group=y)
+#' node[[sprintf('%s_diversity',y)]] <- diversityPerIDs(metadata, group=y)
 #' directly on a dataframe
-#' metadata$condition_diversity <- SIperIDs(metadata, group=condition)
+#' metadata$condition_diversity <- diversityPerIDs(metadata, group=condition)
 #' @export
-SIperIDs <- function(df, group, diversity_metric = 'simpson') {
+diversityPerIDs <- function(df, group, diversity_metric = 'simpson') {
     #count groups
     tierNcount <- df %>% dplyr::count(.data[[group]])
-    #obtain total N per group
-    nums <- tierNcount %>% summarize(nums=sum(n))
-    #add N to count dataframe
-    tierNcount$nums <- nums$nums
-    #calculate fraction of each sample
-    tierNcount <- tierNcount %>% mutate(presence = n/nums)
     #Pivot table to allow vegan::diversity call
-    tierNwide <- tierNcount %>% dplyr::select(-presence,-nums) %>% pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
-    #NA to 0 necessary for vegan::diversity
-    tierNwide[is.na(tierNwide)] <- 0
+    tierNwide <- tierNcount %>% tidyr::pivot_wider(names_from = .data[[group]],
+                                            values_from = n, 
+                                            values_fill = 0) %>% 
+                                            ungroup %>% 
+                                            data.frame
     #calculate diversity. Can change simpson to other types. Second use of enquo hack just to be able to name it the diversity name, idk if this is necessary
     return(diversity(tierNwide,diversity_metric))
 }
-
 
 #' Prepare ARBOL seurat object metadata for tree building
 #' @param srobj a seurat object with ARBOL 'tierNident' and 'sample' columns
@@ -210,6 +264,9 @@ SIperIDs <- function(df, group, diversity_metric = 'simpson') {
 #' the value of each node.
 #' Supports simpson's, inverse simpson's, and shannon index as implemented in vegan diversity()
 #' @return a metadata dataframe ready for tree building
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' prepSubclusteringMetadata(srobj, maxtiers=10)
 #' @export
@@ -236,7 +293,7 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
       attribute <- enquo(x)
       tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
       vals <- unique(tierNcount[[x]])
-      countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
+      countWide <- tierNcount %>% tidyr::pivot_wider(names_from=all_of(x),values_from=n)
       colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
       numericaltb <- numericaltb %>% left_join(countWide)
     }
@@ -266,6 +323,9 @@ prepSubclusteringMetadata <- function(srobj,maxtiers=10,categorical_attributes,d
 #' @param totals attributes for which to sum values per node.
 #' @return the input seurat object with tiered clustering tree in srobj@@misc$subclusteringTree, 
 #' plot of tree to srobj@@misc$subclusteringViz, and ggraph object to srobj@@misc$cluster_ggraph
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- subclusteringTree(srobj)
 #' @export
@@ -352,6 +412,9 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' added as node$attribute_diversity
 #' @return data.tree object with attributes propagated to all nodes
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' arbolTree <- propagateTree(arbolTree,srobj=srobj, categorical_attributes = categories, 
 #'                            total_attributes = totals,
@@ -418,7 +481,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
     #calculate diversity attributes per node
     for (y in diversity_attributes) {
         ARBOLtree$Do(function(node) {ids <- node$ids %>% unlist; meta <- srobj@meta.data %>% filter(CellID %in% ids);
-                                node[[sprintf('%s_diversity',y)]] <- SIperIDs(meta, group=y, diversity_metric = diversity_metric)
+                                node[[sprintf('%s_diversity',y)]] <- diversityPerIDs(meta, group=y, diversity_metric = diversity_metric)
         })
     }
 
@@ -431,7 +494,7 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
 #' @param srobj a seurat object with ARBOL 'tierNident' column
-#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
+#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction layer in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
 #' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
 #' or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()
@@ -439,16 +502,20 @@ propagateTree <- function(ARBOLtree, srobj, numerical_attributes = NA, categoric
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
 #' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to getCentroids
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param reduction_dims the dimensions of the reduction layer to use for centroid calculation. defaults to 1:25
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @return only pvclust object
 #' @export
 centroidTaxonomy_noSeurat <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
-                                distance_method = 'euclidean', centroid_method = 'mean', 
-                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), nboot = 1) {
+                                distance_method = 'euclidean', centroid_method = 'mean', centroid_layer = 'scale.data',
+                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = Features(srobj), nboot = 1) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
       centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
+                         centroid_method = centroid_method, centroid_assay = centroid_assay, 
+                         centroid_layer = centroid_layer, gene_list = gene_list)
 
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=nboot)
 
@@ -457,15 +524,14 @@ centroidTaxonomy_noSeurat <- function(srobj, tree_reduction = 'centroids', hclus
 
     else {
       message(sprintf('%s isnt an ARBOL implemented reduction for tree building, or does not exist in srobj@reductions',tree_reduction))
-    }
-  
+    } 
 }
 
 
 #' Calculate pvclust() tree (a binary tree of distances between end-clusters) for ARBOL results
 #' default method creates a tree based on euclidean distance between cluster centroids based on gene medians with complete linkage
 #' @param srobj a seurat object with ARBOL 'tierNident' column
-#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
+#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction layer in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
 #' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
 #' or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()
@@ -473,31 +539,30 @@ centroidTaxonomy_noSeurat <- function(srobj, tree_reduction = 'centroids', hclus
 #' currently, sum, count, mean, and median are supported
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
 #' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation. passes to getCentroids
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param reduction_dims the dimensions of the reduction layer to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- centroidTaxonomy(srobj = srobj, tree_reduction = 'pca', hclust_method = 'complete',
 #'                          distance_method = 'euclidean', centroid_method = 'median', 
 #'                          centroid_assay = 'SCT', reduction_dims = 1:25)
 #' @export
 centroidTaxonomy <- function(srobj, tree_reduction = 'centroids', hclust_method = 'complete',
-                                distance_method = 'euclidean', centroid_method = 'mean', 
-                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), nboot = 1) {
+                                distance_method = 'euclidean', centroid_method = 'mean', centroid_layer = 'scale.data',
+                               centroid_assay = 'SCT', reduction_dims = 1:25, gene_list = Features(srobj), nboot = 1) {
 
     if (tree_reduction == 'centroids' | tree_reduction %in% names(srobj@reductions)) {
       centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
-
+                         centroid_method = centroid_method, centroid_assay = centroid_assay, 
+                         centroid_layer = centroid_layer, gene_list = gene_list)
       result <- pvclust(centroids, method.dist=distance_method, method.hclust=hclust_method, nboot=nboot)
-
       srobj@misc$pvclust <- result
     }
-
     else {
       message(sprintf('%s isnt an ARBOL implemented reduction for tree building, or does not exist in srobj@reductions',tree_reduction))
     }
-
-
     return(srobj)
 }
 
@@ -508,47 +573,46 @@ centroidTaxonomy <- function(srobj, tree_reduction = 'centroids', hclust_method 
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
 #' @param gene_list if using cell x gene data (not any srobj@@reduction), genes to include in centroid calculation
 #' @param tree_reduction cell x gene reduction space to work from. 'centroids' uses full cell x gene.
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param reduction_dims the dimensions of the reduction layer to use for centroid calculation. defaults to 1:25
 #' @return the input seurat object with pvclust tree in srobj@@misc$pvclust
 #' @examples
 #' centroids <- getCentroids(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
 #'                         centroid_method = centroid_method, centroid_assay = centroid_assay, gene_list = gene_list)
 #' @export
-getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reduction_dims = reduction_dims,
-                         centroid_method = "mean", centroid_assay = centroid_assay, gene_list = rownames(srobj[["RNA"]]@data)) {
-
+getCentroids <- function(srobj = srobj, 
+                         tree_reduction = tree_reduction,
+                         reduction_dims = reduction_dims,
+                         centroid_method = "mean",
+                         centroid_assay = "RNA",
+                         centroid_layer = 'scale.data',
+                         gene_list = Features(srobj)) {
     # Convert the centroid_method string to a function
     if (is.character(centroid_method)) {
         centroid_method_func <- match.fun(centroid_method)
     } else {
         stop("centroid_method should be a string representing an aggregation function.")
     }
-  
     srobj_meta <- srobj@meta.data
-    
-    if (tree_reduction %in% names(srobj@reductions)) {
+    if (tree_reduction %in% names(srobj@reductions) & tree_reduction != 'centroids') {
         scaled.data.mtx <- Embeddings(srobj, reduction=tree_reduction)[, reduction_dims]
     } else {
-        gene_list <- match(gene_list, rownames(srobj[[centroid_assay]]@data))
+        gene_list <- gene_list[match(gene_list, Features(srobj, layer = centroid_layer))]
         gene_list <- gene_list[!is.na(gene_list)]
-        submtx <- srobj[[centroid_assay]]@data[gene_list,]
-        scaled.data.mtx <- Matrix(t(as.matrix(submtx)), sparse=TRUE)
+        submtx <- FetchData(srobj[[centroid_assay]], layer = centroid_layer, vars = gene_list)
+        scaled.data.mtx <- Matrix(as.matrix(submtx), sparse=TRUE)
     }
-
     t2 <- srobj_meta[, c('CellID', 'tierNident')]
     t3 <- data.frame(tierNident = unique(t2$tierNident), i = seq_along(unique(t2$tierNident)))
     t2$i <- as.double(match(t2$tierNident, t3$tierNident))
     t4 <- Matrix(unlist(dplyr::select(t2, i)), sparse=TRUE)
-
     scaled.data.t <- cbind(t4, scaled.data.mtx)
     rows <- row.names(scaled.data.t)
-
-    # Using efficient_dgcMatrix_aggregator for aggregation
-    clst.cntrs <- efficient_dgcMatrix_aggregator(scaled.data.t[rows, -1], as.numeric(scaled.data.t[rows, 1, drop=FALSE]), centroid_method_func)
-
+    # aggregate centroids in sparse format using dgcMatrix.aggregate
+    clst.cntrs <- dgcMatrix.aggregate(scaled.data.t[rows, -1], 
+                                      as.numeric(scaled.data.t[rows, 1, drop=FALSE]), 
+                                      centroid_method_func)
     g <- as.data.frame(t(as.matrix(clst.cntrs)))
     colnames(g) <- t3$tierNident
-
     return(g)
 }
 
@@ -563,7 +627,7 @@ getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reducti
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @param counts attributes for which to count unique values per node.
 #' @param totals attributes for which to sum values per node.
-#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction slot in srobj
+#' @param tree_reduction either 'centroids', which calculates centroids among all genes, or any reduction layer in srobj
 #' @param hclust_method any hierarchical clustering method implemented in pvclust::pvclust(method.hclust), defaults to 'complete'
 #' @param distance_method any distance method implemented in pvclust::pvclust(method.dist) - one of "correlation", "abscor", "uncentered", "euclidean" -
 #' or cosine (no quotes) as implemented in ARBOL::cosine. you may also write your own function that returns a dist object, as in pvclust::pvclust()
@@ -572,9 +636,12 @@ getCentroids <- function(srobj = srobj, tree_reduction = tree_reduction, reducti
 #' @param centroid_assay if using cell x gene data (not any srobj@@reduction), the assay within which to calculate centroids
 #' @param gene_list if using cell x gene data (not any srobj@@reduction), list of genes to include in centroid calculation. 
 #' defaults to all genes in centroid_assay if no input is given
-#' @param reduction_dims the dimensions of the reduction slot to use for centroid calculation. defaults to 1:25
+#' @param reduction_dims the dimensions of the reduction layer to use for centroid calculation. defaults to 1:25
 #' @param nboot number of bootstraps for pvclust() function. defaults to 1 for speed
 #' @return the input seurat object with binary tree pvclust object in srobj@@misc$pvclust, 
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- ARBOLcentroidTaxonomy(srobj, categories = c('celltype','disease'))
 #' @export
@@ -583,7 +650,8 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
                                 totals = 'nCount_RNA', tree_reduction = 'centroids', 
                                 hclust_method = 'complete', distance_method = 'euclidean', 
                                 centroid_method = 'mean', centroid_assay = 'SCT', 
-                                reduction_dims = 1:25, gene_list = rownames(srobj[["RNA"]]@data), 
+                                centroid_layer = 'scale.data',
+                                reduction_dims = 1:25, gene_list = Features(srobj), 
                                 nboot = 1) {
 
   if(any(srobj@meta.data$tierNident %like% '/')) {
@@ -592,7 +660,7 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
   }
 
   if (!is.character(gene_list)) {
-    gene_list = rownames(srobj[[centroid_assay]]@data)
+    gene_list = Features(srobj[[centroid_assay]], layer = centroid_layer)
   } 
 
   if (!is.element('sample',diversities)) {
@@ -608,24 +676,31 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
   }
   
   srobj <- centroidTaxonomy(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
-                          distance_method = distance_method, centroid_method = centroid_method, 
-                          centroid_assay = centroid_assay, gene_list = gene_list, reduction_dims = reduction_dims, nboot = nboot)
+                          distance_method = distance_method, centroid_method = centroid_method, centroid_assay = centroid_assay, 
+                          centroid_layer = centroid_layer, gene_list = gene_list, reduction_dims = reduction_dims, nboot = nboot)
 
   binarydf <- binaryTreeToDF(pvclust_tree=srobj@misc$pvclust)
 
-  divtree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
+  dataTree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
                                 diversity_metric = diversity_metric, counts = counts, totals = totals)
 
-  divtree <- propagateTree(divtree,srobj = srobj, categorical_attributes = categories, 
+  dataTree <- propagateTree(dataTree,srobj = srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts, total_attributes = totals)
 
-  x <- data.tree_to_ggraph(divtree, categories, diversities, counts, totals, 'numChildren')
+  tidyGraph <- data.tree_to_ggraph(dataTree,
+                                   categories,
+                                   diversities,
+                                   counts,
+                                   totals,
+                                   'numChildren')
+  tidyGraph <- tidyGraph %>% activate(nodes) %>%
+               mutate(tier = str_count(label, "\\."))
+  tidyGraph <- tidyGraph %>% activate(nodes) %>%
+               mutate(string = label,
+                      name = basename(label) %>%
+               str_replace_all("T0C0.", ""))
 
-  x <- x %>% activate(nodes) %>% mutate(tier = str_count(label, "\\."))
-
-  x <- x %>% activate(nodes) %>% mutate(string = label, name = basename(label) %>% str_replace_all('T0C0.',''))
-
-  bt1 <- ggraph(x, layout = 'dendrogram', height=plotHeight*10) +
+  bt1 <- ggraph(tidyGraph, layout = 'dendrogram', height=plotHeight*10) +
     geom_edge_elbow() + 
     geom_node_point(size=0) + 
     geom_node_text(aes(filter = leaf, label = name), nudge_y=-0.75,vjust=0.5,hjust=0,angle=270) + 
@@ -637,9 +712,9 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
 
   srobj@misc$taxViz <- bt1
 
-  srobj@misc$taxTree <- divtree
+  srobj@misc$taxTree <- dataTree
   
-  srobj@misc$tax_ggraph <- x
+  srobj@misc$tax_ggraph <- tidyGraph
 
   #add metrics used for tree creation to seurat object
   srobj@misc$tree_metrics[['diversities']] <- diversities
@@ -651,6 +726,7 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
   srobj@misc$tree_metrics[['distance_method']] <- distance_method
   srobj@misc$tree_metrics[['centroid_method']] <- centroid_method
   srobj@misc$tree_metrics[['centroid_assay']] <- centroid_assay
+  srobj@misc$tree_metrics[['centroid_layer']] <- centroid_layer
   srobj@misc$tree_metrics[['reduction_dims']] <- reduction_dims
   srobj@misc$tree_metrics[['gene_list']] <- gene_list
 
@@ -678,7 +754,6 @@ cosine <- function(x) {
 #' 3) tidygraph::as_tbl_graph to convert from ape to ggraph
 #' 4) data.tree to node-level dataframe 
 #' 5) join node-level dataframe to tbl_graph nodes
-#' The use of ToNewick is a major bottleneck in computation speed right now
 data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   txt <- ToNewickPS(data.tree)
   apeTree <- ape::read.tree(text=txt)
@@ -694,15 +769,34 @@ data.tree_to_ggraphNW <- function(data.tree, categories, diversities, counts) {
   return(x)
 }
 
-#' data.tree to ggraph conversion, by converting data.tree structure to dendrogram via custom PS function
-#' then ape (still doesn't carry annotations) to ggraph,
-#' then join data frame of data.tree to restore annotations.
-#' requires 'n' and 'pathString' annotations in data.tree
-#' Used to convert annotated binary phylogeny tree to ggraph for easier plotting 
-#' 1) write data.tree object to dend object using custom as.dendrogram.Node function,
-#' 2) convert dendrogram structure object to ggraph using tidygraph::as_tbl_graph
-#' 3) left join heights, categories, diversities, and counts to tbl_graph object
-#' previous version data.tree_to_ggraphNW used highly inefficient newick text conversion for tree structure
+#' Convert data.tree to ggraph
+#' Converts a data.tree structure to a ggraph object for easier plotting, by first converting the data.tree structure to a dendrogram via a custom as.dendrogram.Node function, then to a ggraph object, and finally restoring annotations by joining a data frame of data.tree attributes.
+#' This function is used to convert annotated binary phylogeny trees to ggraph objects, offering a more efficient alternative to previous versions that used Newick text conversion.
+#' @param data.tree A data.tree object representing an annotated binary phylogeny tree.
+#' @param categories A character vector of category attributes present in the data.tree 
+#'        object to be included in the ggraph.
+#' @param diversities A character vector of diversity attributes present in the data.tree 
+#'        object to be included in the ggraph.
+#' @param counts A character vector of count attributes present in the data.tree object 
+#'        to be included in the ggraph.
+#' @param totals A character vector of total attributes present in the data.tree object 
+#'        to be included in the ggraph.
+#' @param heightAttribute The name of the attribute used to define the height of the nodes 
+#'        in the resulting ggraph object. Defaults to 'plotHeight'.
+#' @return A tbl_graph object suitable for plotting with ggraph, containing the structure 
+#'         of the data.tree and annotations for nodes and edges.
+#' @importFrom dplyr select left_join
+#' @importFrom tidygraph as_tbl_graph
+#' @examples
+#' # Assuming `myTree` is a data.tree object with necessary annotations:
+#' ggraph_tree <- data.tree_to_ggraph(data.tree = myTree,
+#'                                    categories = c("Category1", "Category2"),
+#'                                    diversities = c("Diversity1", "Diversity2"),
+#'                                    counts = c("Count1", "Count2"),
+#'                                    totals = c("Total1", "Total2"))
+#' # Now `ggraph_tree` can be plotted with ggraph:
+#' ggraph(ggraph_tree) + geom_edge_link() + geom_node_point()
+#' @export
 data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, totals, heightAttribute = 'plotHeight') {
   datadend <- as.dendrogram.NodePS(data.tree, heightAttribute = heightAttribute)
   attrs <- data.tree$attributesAll
@@ -726,6 +820,9 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, tota
 #' @param counts attributes for which to count unique values per node.
 #' @param totals attributes for which to sum values per node.
 #' @return tree with attributes alloted to internal nodes
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @export 
 treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts, totals) {
   srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
@@ -758,7 +855,7 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
   attribute <- enquo(x)
   tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
   vals <- unique(tierNcount[[x]])
-  countWide <- tierNcount %>% pivot_wider(names_from=all_of(x),values_from=n)
+  countWide <- tierNcount %>% tidyr::pivot_wider(names_from=all_of(x),values_from=n)
   colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
   numericaltb <- numericaltb %>% left_join(countWide)
   }
@@ -785,11 +882,14 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
 #' Directly prunes srobj-attached binary tree. 
 #' We suggest re-calculating tree (or just ggraph for viz) from here using centroidTaxonomy() or remake_ggraph(), 
 #' so that new endclusters are treated as leaf nodes
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, 
+#' @param srobj a seurat object with a binarytree calculated in layer srobj@@misc$taxTree, 
 #' typically calculated using ARBOLcentroidTaxonomy
 #' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
 #' @param size_threshold cluster size below which to prune nodes from tree
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- mergeEndclusts(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
 #' @export
@@ -817,10 +917,13 @@ mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
 }
 
 #' Merge based on sample diversity and endclust size, only outputting new end-clusters per cell
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
+#' @param srobj a seurat object with a binarytree calculated in layer srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
 #' @param sample_diversity_threshold sample diversity below which to prune nodes from tree
 #' @param size_threshold cluster size below which to prune nodes from tree
 #' @return dataframe with 2 columns, cellid and new endcluster
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- mergeEndclustsIdents(srobj, sample_diversity_threshold = 0.1, size_threshold = 10)
 #' @export
@@ -848,11 +951,14 @@ mergeEndclustsIdents <- function(srobj, sample_diversity_threshold, size_thresho
 #' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds
 #' We suggest re-calculating tree (or just ggraph for viz) from here using centroidTaxonomy() or remake_ggraph(), 
 #' so that new endclusters are treated as leaf nodes
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
+#' @param srobj a seurat object with a binarytree calculated in layer srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return the input seurat object with merged tierNidents in a new metadata column, mergedIdent 
 #' and a merged data.tree object in srobj@@misc$workingTree
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- mergeEndclustsCustom(srobj, threshold_attributes = c('sample_diversity','n'), 
 #'                               thresholds = c(0.2,50))
@@ -888,7 +994,7 @@ mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
 
 #' Merges tierNidents with their nearest neighbors in a srobj-attached binary tree by custom thresholds, 
 #' outputs dataframe of new idents
-#' @param srobj a seurat object with a binarytree calculated in slot srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
+#' @param srobj a seurat object with a binarytree calculated in layer srobj@@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy
 #' @param threshold_attributes list of srobj metadata columns to threshold on
 #' @param thresholds list of threshold values to prune, in same order as threshold_attributes
 #' @return dataframe of new idents
@@ -921,6 +1027,9 @@ mergeEndclustsCustomIdents <- function(srobj, threshold_attributes, thresholds) 
 #' Converts pvclust tree object to dataframe with row per node and pvclust p-values
 #' @param pvclust_tree a pvclust or hclust tree 
 #' @return a dataframe with one row per node of the tree
+#' @importFrom dplyr filter select mutate left_join summarize
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' binarydf <- binaryTreeToDF(pvclust_tree=srobj@@misc$pvclust)
 #' @export
@@ -941,9 +1050,10 @@ binaryTreeToDF <- function(pvclust_tree) {
 #' Used in ARBOL workflow to create a tbl_graph object, a class useful for plotting dendrograms
 #' @param tree usually a custom annotated data.tree object
 #' @return a dataframe of the tree with one row per node
+#' @importFrom stringr str_replace_all
 #' @examples
-#' ARBOLdf <- allotedTreeToDF(divtree)
-#' txt <- ARBOL::ToNewickPS(divtree)
+#' ARBOLdf <- allotedTreeToDF(dataTree)
+#' txt <- ARBOL::ToNewickPS(dataTree)
 #' ARBOLphylo <- ape::read.tree(text=txt)
 #' 
 #' x <- as_tbl_graph(ARBOLphylo, directed=T) %>% activate(nodes) %>% 
@@ -968,6 +1078,9 @@ allotedTreeToDF <- function(tree, ...) {
 #' @param diversity_attributes the attributes you wish to calculate diversity for (e.g. disease, sample)
 #' @param diversity_metric one of 'shannon', 'simpson', or 'invsimpson'
 #' @return the seurat object with diversity per attribute per tierNident added to the metadata
+#' @importFrom dplyr filter select mutate left_join summarize select
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- tierN_diversity(srobj, diversity_attributes = c('sample','disease'))
 #' @export
@@ -985,6 +1098,9 @@ tierN_diversity <- function(srobj, diversity_attributes, diversity_metric = 'sim
 #' @param df a dataframe with ARBOL tierNident (usually srobj@@meta.data)
 #' @param max_tiers max_tiers parameter used in ARBOL
 #' @return the dataframe with separate tier columns, useful for producing and plotting dendrograms
+#' @importFrom dplyr filter select mutate left_join summarize select
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj@@meta.data <- spread_tierN(srobj@@meta.data)
 #' @export
@@ -1020,6 +1136,9 @@ spread_tierN <- function(df, max_tiers = 10, sep='.') {
 #' @param standardname_col metadata column to which to output celltype names. defaults to 'curatedname'
 #' @param n_genes number of genes with which to create standard names. defaults to 2
 #' @return the seurat object with curatedname column in metadata
+#' @importFrom dplyr filter select mutate left_join summarize select
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- getStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
@@ -1125,6 +1244,9 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
 #' @param standardname_col metadata column to which to output celltype names. defaults to 'curatedname'
 #' @param n_genes number of genes with which to create standard names. defaults to 2
 #' @return a dataframe with standard names per end-cluster
+#' @importFrom dplyr filter select mutate left_join summarize select
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- outputStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
@@ -1207,6 +1329,9 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
 #' @param counts attributes for which to count unique values per node.
 #' @param totals attributes to sum up the tree per node
 #' @return the seurat object with ggraph object remade in srobj@@misc$tax_ggraph
+#' @importFrom dplyr filter select mutate left_join summarize select
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' srobj <- remake_ggraph(srobj, categories = c('curatedname','celltype'), 
 #'                        diversities = c('curatedname','celltype'), counts = c('celltype'))
@@ -1227,13 +1352,13 @@ remake_ggraph <- function(srobj, categories, diversities, counts, totals = 'nCou
 
   binarydf <- binaryTreeToDF(pvclust_tree=srobj@misc$pvclust)
 
-  divtree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
+  dataTree <- treeAllotment(srobj, treedf = binarydf, categories = categories, diversities = diversities, 
                                 diversity_metric = diversity_metric, counts = counts, totals = totals)
 
-  divtree <- propagateTree(divtree,srobj=srobj, categorical_attributes = categories, 
+  dataTree <- propagateTree(dataTree,srobj=srobj, categorical_attributes = categories, 
     diversity_attributes = diversities, numerical_attributes = counts, total_attributes = totals)
 
-  srobj@misc$tax_ggraph <- data.tree_to_ggraph(divtree, categories, diversities, counts, totals)
+  srobj@misc$tax_ggraph <- data.tree_to_ggraph(dataTree, categories, diversities, counts, totals)
 
   return(srobj)
 
@@ -1305,18 +1430,20 @@ pieify_tree_plot <- function(ggraph_plot, srobj, color_metadata, y_cutoff = 1,ra
 #'
 #' @param srobj A Seurat object with @@misc$tax_ggraph
 #' @param feature The name of the feature whose expression values are to be z-scored.
-#' @param assay The name of the assay slot where the data resides. default: RNA
+#' @param assay The name of the assay layer where the data resides. default: RNA
 #'
 #' @return The updated graph object with the added mean z-scores for the given feature per node.
-#'
+#' @importFrom dplyr filter select mutate left_join summarize select tibble
+#' @importFrom tidyr pivot_longer pivot_wider
+#' @importFrom tibble column_to_rownames rownames_to_column
 #' @export
 #'
 feature_zscore <- function(srobj, feature, assay) {
   
-  expr_values <- FetchData(srobj, vars = feature, slot = "data")[[feature]]
+  expr_values <- FetchData(srobj, vars = feature, layer = "data")[[feature]]
   z_scores <- scale(expr_values)[,1]
   
-  cell_zscores_df <- data.frame(cell_id = colnames(srobj[[assay]]@data), 
+  cell_zscores_df <- data.frame(cell_id = Cells(srobj), 
                                 z_score = z_scores, stringsAsFactors = FALSE)
 
   cell_to_pathString_df <- srobj@misc$taxTree$Get('ids')
@@ -1359,17 +1486,28 @@ feature_zscore <- function(srobj, feature, assay) {
 #' vec2 <- sparseVector(c(3), c(2))
 #' sv.cbind(list(vec1, vec2))
 #' @export
-sv.cbind <- function (input_list) {
-    input <- lapply(input_list, as, "dsparseVector")
-    thelength <- unique(sapply(input, length))
-    stopifnot(length(thelength) == 1)
-
-    return(sparseMatrix(
-        x = unlist(lapply(input, slot, "x")),
-        i = unlist(lapply(input, slot, "i")),
-        p = c(0, cumsum(sapply(input, function(x) {length(x@x)}))),
-        dims = c(thelength, length(input))
-    ))
+sv.cbind <- function(input_list) {
+  # Length of longest input vector determines the length of the sparse matrix
+  # These lengths are always the same in Seurat.
+  numRows <- max(sapply(input_list, function(v) max(v@length, na.rm = TRUE)))
+  # Initialize components for constructing the sparse matrix
+  x_components <- numeric(0)
+  i_components <- integer(0)
+  p_components <- c(0)
+  # Iterate over the input list to extract and combine components
+  for (vec in input_list) {
+    x_components <- c(x_components, vec@x)
+    i_components <- c(i_components, vec@i)
+    p_components <- c(p_components, 
+                      p_components[length(p_components)] + length(vec@x))
+  }
+  # Use numRows to ensure the matrix includes the potentially empty last row
+  return(Matrix::sparseMatrix(
+    i = i_components,
+    j = rep(seq_along(input_list), sapply(input_list, function(v) length(v@x))),
+    x = x_components,
+    dims = c(numRows, length(input_list)) # Adjusted to use numRows
+  ))
 }
 
 #' Efficient Aggregation of dgCMatrix Columns
@@ -1385,41 +1523,33 @@ sv.cbind <- function (input_list) {
 #' @examples
 #' mat <- Matrix(c(1, 0, 2, 0, 0, 3), nrow = 3, sparse = TRUE)
 #' groups <- c(1, 1, 2)
-#' efficient_dgcMatrix_aggregator(mat, groups, mean)
+#' dgcMatrix.aggregate(mat, groups, mean)
 #' @export
-efficient_dgcMatrix_aggregator <- function(mat, groupings, aggregation_function) {
+dgcMatrix.aggregate <- function(mat, groupings, aggregation_function) {
     unique_groups <- unique(groupings)
     num_unique_groups <- length(unique_groups)
-
     # Placeholder for the final matrix
-    aggregated_columns <- vector('list', ncol(mat))
-
+    aggregated_columns <- vector("list", ncol(mat))
     for (j in seq_len(ncol(mat))) {
         # Extract a sparse column vector
         col_data <- mat[, j, drop = FALSE]
-
         group_values <- split(col_data@x, factor(groupings[col_data@i + 1], levels = unique_groups))
         aggregated_values <- sapply(group_values, aggregation_function, simplify = "numeric")
-
         # Indices of non-zero entries
         non_zero_indices <- which(!is.na(aggregated_values) & aggregated_values != 0)
-
         # Create sparse vector
         aggregated_vector <- sparseVector(
           x = aggregated_values[non_zero_indices],
           i = non_zero_indices,
           length = num_unique_groups
         )
-
         aggregated_columns[[j]] <- aggregated_vector
     }
-
-    # Then, within efficient_dgcMatrix_aggregator:
+    # sv.cbind combines the newly aggregated sparse vectors into a sparse matrix
     aggregated_mat <- sv.cbind(aggregated_columns)
-
-
     return(aggregated_mat)
 }
+
 
 #' ARBOL Aggregate Function
 #'

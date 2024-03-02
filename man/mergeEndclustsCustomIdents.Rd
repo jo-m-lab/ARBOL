@@ -8,7 +8,7 @@ outputs dataframe of new idents}
 mergeEndclustsCustomIdents(srobj, threshold_attributes, thresholds)
 }
 \arguments{
-\item{srobj}{a seurat object with a binarytree calculated in slot srobj@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy}
+\item{srobj}{a seurat object with a binarytree calculated in layer srobj@misc$taxTree, typically calculated using ARBOLcentroidTaxonomy}
 
 \item{threshold_attributes}{list of srobj metadata columns to threshold on}
 

@@ -11,8 +11,7 @@ Used to convert annotated binary phylogeny tree to ggraph for easier plotting
 2) read Newick into ape tree object
 3) tidygraph::as_tbl_graph to convert from ape to ggraph
 4) data.tree to node-level dataframe 
-5) join node-level dataframe to tbl_graph nodes
-The use of ToNewick is a major bottleneck in computation speed right now}
+5) join node-level dataframe to tbl_graph nodes}
 \usage{
 data.tree_to_ggraphNW(data.tree, categories, diversities, counts)
 }
@@ -27,5 +26,4 @@ Used to convert annotated binary phylogeny tree to ggraph for easier plotting
 3) tidygraph::as_tbl_graph to convert from ape to ggraph
 4) data.tree to node-level dataframe 
 5) join node-level dataframe to tbl_graph nodes
-The use of ToNewick is a major bottleneck in computation speed right now
 }
