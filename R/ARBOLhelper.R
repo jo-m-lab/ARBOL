@@ -202,28 +202,36 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
 #'                          suppressMessages
 #' @export
 diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') {
-  #enquo parameters to allow dplyr calls
-    divcols <- enquo(species)
-    #count groups per species
-    tierNcount <- df %>% group_by_at(vars(!!divcols)) %>% dplyr::count(.data[[group]])
-    #obtain total N per group
-    nums <- tierNcount %>% summarize(nums=sum(n))
-    #add N to count dataframe
-    tierNcount <- tierNcount %>% left_join(nums) %>% suppressMessages
-    #calculate fraction of sample per species
-    tierNcount <- tierNcount %>% mutate(presence = n/nums)
-    #Pivot table to allow vegan::diversity call
-    tierNwide <- tierNcount %>% dplyr::select(-presence,-nums) %>% tidyr::pivot_wider(names_from=.data[[group]],values_from=n) %>% ungroup %>% data.frame
-    #rownames are necessary, here hacking rownames from enquo with alphanumeric gsub
-    tierNwide <- tierNwide %>% column_to_rownames(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""))
-    #NA to 0 necessary for vegan::diversity
-    tierNwide[is.na(tierNwide)] <- 0
-    #calculate diversity. Can change simpson to other types. Second use of enquo hack just to be able to name it the diversity name, idk if this is necessary
-    simps <- diversity(tierNwide,diversity_metric) %>% data.frame %>% rownames_to_column(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""))
-    #Add 2 column names: your species category (i usually use pathString pulled from the node on the tree), and diversity. This joins to the dataframe by species category.
-    colnames(simps) <- c(str_replace_all(as.character(vars(!!divcols)),"[^[:alnum:]]", ""),sprintf('%s_diversity',group))
-    return(simps)
+  # Convert strings to symbols for curly-curly operator
+  species_sym <- rlang::sym(species)
+  group_sym <- rlang::sym(group)
+  # Count groups per species directly using curly-curly
+  tierNcount <- df %>%
+    group_by({{species_sym}}) %>%
+    count({{group_sym}}, name = "n") %>% ungroup
+  # Pivot table to allow vegan::diversity call
+  tierNwide <- tierNcount %>%
+    pivot_wider(names_from = {{group_sym}}, values_from = n, values_fill = list(n = 0))
+  # Use rownames of species for the diversity function, which needs a dataframe
+  tierNwide_df <- as.data.frame(tierNwide)
+  # species column must be first
+  tierNwide_df <- tierNwide_df %>% select({{species}}, everything())
+  rownames(tierNwide_df) <- tierNwide_df[, 1]
+  tierNwide_df <- tierNwide_df[, -1]
+  # Calculate diversity
+  diversity_values <- vegan::diversity(tierNwide_df, index = diversity_metric)
+  # Prepare result as a dataframe
+  result <- data.frame(
+    species = rownames(tierNwide_df),
+    diversity = diversity_values,
+    row.names = NULL
+  )
+  # Rename diversity column
+  names(result)[1] <- species
+  names(result)[2] <- sprintf('%s_diversity', group)
+  return(result)
 }
+
 
 #' Calculate diversity index for a set of IDs in a dataframe
 #' @param df a dataframe with group information per cell
@@ -249,7 +257,7 @@ diversityPerIDs <- function(df, group, diversity_metric = 'simpson') {
                                             ungroup %>% 
                                             data.frame
     #calculate diversity. Can change simpson to other types. Second use of enquo hack just to be able to name it the diversity name, idk if this is necessary
-    return(diversity(tierNwide,diversity_metric))
+    return(vegan::diversity(tierNwide,diversity_metric))
 }
 
 #' Prepare ARBOL seurat object metadata for tree building
@@ -840,10 +848,11 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
   totalsdf <- srobj@meta.data %>% dplyr::select(CellID,tierNident,all_of(totals))
 
   for (x in totals) {
-    attribute <- enquo(x)
+    attribute <- rlang::sym(x)
     totalstb <- totalsdf %>% dplyr::select(tierNident,x) %>% group_by(tierNident) %>%
-        summarize(tierNident=unique(tierNident),sum(.data[[attribute]]))
+        summarize(tierNident=unique(tierNident), .sum = sum({{attribute}}))
     colnames(totalstb) <- c('tierNident',x)
+    names(totalstb)[names(totalstb) == ".sum"] <- x
     totalsdf <- totalsdf %>% dplyr::select(-x) %>% left_join(totalstb)
   }
 
@@ -852,15 +861,19 @@ treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metr
   numericaltb <- srobj@meta.data %>% dplyr::select(CellID,sample,tierNident,all_of(counts))
 
   for (x in counts) {
-  attribute <- enquo(x)
-  tierNcount <- numericaltb %>% group_by(tierNident) %>% dplyr::count(.data[[attribute]])
-  vals <- unique(tierNcount[[x]])
-  countWide <- tierNcount %>% tidyr::pivot_wider(names_from=all_of(x),values_from=n)
-  colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
-  numericaltb <- numericaltb %>% left_join(countWide)
+    attribute <- rlang::sym(x)
+    tierNcount <- numericaltb %>%
+                  group_by(tierNident) %>%
+                  count({{attribute}}, name = "n")
+    vals <- unique(tierNcount %>% pull({{attribute}}))
+    countWide <- tierNcount %>%
+                 pivot_wider(names_from = {{attribute}},
+                             values_from = n,
+                             names_prefix = paste0(x, "_n_"),
+                             values_fill = 0)
+    colnames(countWide) <- c('tierNident',sprintf('%s_n_%s',x,vals))
+    numericaltb <- numericaltb %>% left_join(countWide)
   }
-
-  numericaltb[is.na(numericaltb)] <- 0
 
   numericaltb <- numericaltb %>% dplyr::select(-CellID,-sample,-all_of(counts)) %>% distinct
 

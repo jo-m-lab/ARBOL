@@ -46,7 +46,7 @@ test_that("ARBOLcentroidTaxonomy workflow tests\n
                sort(Cells(mock_seurat)))
   # make sure diversities are in end nodes
   # and make sure they"re propagated correctly
-  end_node_diversities <- diversity(mock_seurat@meta.data %>%
+  end_node_diversities <- vegan::diversity(mock_seurat@meta.data %>%
                              dplyr::count(sample, tierNident) %>%
                              tidyr::pivot_wider(names_from = sample,
                                          values_from = n, values_fill = 0) %>%
@@ -95,6 +95,59 @@ test_that("sv.cbind combines 3 int sparse vectors correctly", {
   result <- sv.cbind(list(v1, v2, v3))
   # Test if result matches expected
   expect_equal(result, expected_mat)
+})
+
+test_that("diversityPerGroup returns diversities as expected", {
+  mock_seurat <- CreateMockSeuratObject()
+  end_node_diversities <- vegan::diversity(mock_seurat@meta.data %>%
+                             dplyr::count(sample, tierNident) %>%
+                             tidyr::pivot_wider(names_from = sample,
+                                         values_from = n, values_fill = 0) %>%
+                             column_to_rownames("tierNident"),
+                             "simpson") %>%
+                             data.frame %>% rownames_to_column('tierNident')
+  colnames(end_node_diversities) <- c('tierNident', 'sample_diversity')
+  # DiversityPerGroup tests unwrapped
+  df <- mock_seurat@meta.data
+  species <- "tierNident"
+  group <- "sample"
+  species_sym <- rlang::sym(species)
+  group_sym <- rlang::sym(group)
+  
+  # Count groups per species directly using curly-curly
+  tierNcount <- df %>%
+    group_by({{species_sym}}) %>%
+    count({{group_sym}}, name = "n") %>% ungroup
+  
+  # Pivot table to allow vegan::diversity call
+  tierNwide <- tierNcount %>%
+    pivot_wider(names_from = {{group_sym}}, values_from = n, values_fill = list(n = 0))
+
+  # Use rownames from species for the diversity function, which requires a matrix or dataframe with rownames
+  tierNwide_df <- as.data.frame(tierNwide)
+  # Ensure species column is the first column for row names
+  tierNwide_df <- tierNwide_df %>% select({{species}}, everything())
+  rownames(tierNwide_df) <- tierNwide_df[, 1]
+  tierNwide_df <- tierNwide_df[, -1]
+
+  # Calculate diversity
+  diversity_values <- vegan::diversity(tierNwide_df, index = diversity_metric)
+  
+  # Prepare the result as a dataframe
+  result <- data.frame(
+    species = rownames(tierNwide_df),
+    diversity = diversity_values,
+    row.names = NULL
+  )
+  # Rename the diversity column
+  names(result)[1] <- species
+  names(result)[2] <- sprintf('%s_diversity', group)
+  wrapped <- diversityPerGroup(mock_seurat@meta.data, 'tierNident', 'sample')
+
+  # manual calculation vs. unwrapped run check
+  expect_equal(end_node_diversities, result)
+  # unwrapped run vs. wrapped check
+  expect_equal(result, wrapped)
 })
 
 test_that("sv.cbind combines two random vectors correctly", {
