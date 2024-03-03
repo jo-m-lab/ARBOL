@@ -910,8 +910,11 @@ mergeEndclusts <- function(srobj, sample_diversity_threshold, size_threshold) {
   divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,binIdent = pathString)
   divdf2$binIdent <- divdf2$binIdent %>% str_replace_all('\\/','.')
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdf2 %>% dplyr::select(CellID,mergedIdent=binIdent)) %>%
-                     rename(tierNident=mergedIdent,rawIdent=tierNident)
+  mergeCdf <- divdf2 %>% dplyr::select(CellID,tierNident=binIdent) %>% column_to_rownames('CellID')
+
+  srobj$rawIdent <- srobj$tierNident
+
+  srobj <- AddMetaData(srobj, mergeCdf)
 
   return(srobj)
 }
@@ -978,14 +981,15 @@ mergeEndclustsCustom <- function(srobj, threshold_attributes, thresholds) {
   divdf2 <- divtestdf %>% mutate(ids = strsplit(ids, ", ")) %>% unnest(cols = c(ids))
   divdf2 <- divdf2 %>% group_by(ids) %>% slice_min(height) %>% ungroup
 
-  divdf2 <- divdf2 %>% dplyr::rename(CellID=ids,mIdent = pathString)
+  divdf2 <- divdf2 %>% dplyr::rename(CellID = ids, mIdent = pathString)
   divdf2$mIdent <- divdf2$mIdent %>% str_replace_all('\\/','.')
-  divdf3 <- divdf2 %>% dplyr::select(mIdent,CellID)
+  divdf3 <- divdf2 %>% dplyr::select(tierNident = mIdent, CellID)
 
-  srobj@meta.data <- srobj@meta.data %>% left_join(divdf3)
-  srobj@meta.data$rawIdent <- srobj@meta.data$tierNident
-  srobj@meta.data$tierNident <- srobj@meta.data$mIdent
-  srobj@meta.data <- srobj@meta.data %>% dplyr::select(-mIdent)      
+  mergeCdf <- divdf3 %>% column_to_rownames('CellID')
+
+  srobj$rawIdent <- srobj$tierNident
+
+  srobj <- AddMetaData(srobj, mergeCdf)
 
   srobj@misc$workingTree <- workingTree
 
@@ -1212,7 +1216,14 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
 
   markersAsList <- markersAsList %>% dplyr::rename(tierNident=cluster)
 
-  srobj@meta.data <- left_join(srobj@meta.data,markersAsList,by=c("tierNident",celltype_col))
+  markerjoin <- left_join(srobj@meta.data %>% 
+                          rownames_to_column('tmp_marker_id_col'),
+                          markersAsList,
+                          by=c("tierNident",celltype_col)) %>%
+                          distinct
+  row.names(markerjoin) <- markerjoin$tmp_marker_id_col
+  markerjoin <- subset(markerjoin, select=-tmp_marker_id_col)
+  srobj <- AddMetaData(srobj, markerjoin)
   
   #the following lines will cause the function to give a standard name only for the majority celltype_col per cellstate
   majority <- srobj@meta.data %>% dplyr::count(tierNident,across(celltype_col),markers) %>% group_by(tierNident) %>% 
@@ -1222,15 +1233,17 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
   majority <- majority %>% unite({{standardname_col}},-tierNident,sep='.')
 
   #remove duplicate lines per cellID
-  srobj@meta.data <- srobj@meta.data %>% dplyr::select(-markers) %>% distinct
-
-  srobj@meta.data <- srobj@meta.data %>% left_join(majority)
+  # srobj@meta.data <- srobj@meta.data %>% dplyr::select(-markers) %>% distinct 
+  majorities <- left_join(srobj@meta.data %>% rownames_to_column('tmp_marker_id_col'), majority)
+  row.names(majorities) <- majorities$tmp_marker_id_col
+  majorities <- subset(majorities, select=-tmp_marker_id_col)
+  srobj <- AddMetaData(srobj, majorities)
 
   #Hoping to include an if-statement around the previous block to enable users to 
   #allow or disallow multiple standard names per cellstate
 
   #replace rownames of seurat object metadata
-  row.names(srobj@meta.data) <- srobj@meta.data$CellID
+  # row.names(srobj@meta.data) <- srobj@meta.data$CellID
 
   return(srobj)
 }

@@ -15,6 +15,7 @@ Depends:
     ggplot2,
     dplyr,
     tidyr,
+    tibble,
     pvclust,
     harmony,
     vegan,
