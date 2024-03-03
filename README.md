@@ -1,7 +1,8 @@
-<img src="docs/ARBOLsmall.jpg?raw=true" align="right" width=500px>  
-<!-- badges: start -->
+  <!-- badges: start -->
   [![R-CMD-check](https://github.com/jo-m-lab/ARBOL/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jo-m-lab/ARBOL/actions/workflows/R-CMD-check.yaml)
-<!-- badges: end -->
+  <!-- badges: end -->
+  
+<img src="docs/ARBOLsmall.jpg?raw=true" align="right" width=500px>  
 
 Iteratively cluster single cell datasets using a Seurat v4 object as input. ARBOL() clustering identifies and utilizes optimum 
 cluster resolution parameters at each tier of clustering. It provides outputs of QC plots for each tier and stage.
