@@ -8,6 +8,8 @@ Description: Iteratively clusters seurat object single cell datasets, choosing o
 biocViews:
 Depends:
 	R (>= 4.0.0),
+    testthat,
+    stringi,
 	Seurat,
     data.table,
     future,

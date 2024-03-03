@@ -1146,8 +1146,9 @@ spread_tierN <- function(df, max_tiers = 10, sep='.') {
 #' @examples
 #' srobj <- getStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
-getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_col = 'celltype', 
-                              standardname_col = 'curatedname', n_genes = 2) {
+getStandardNames <- function(srobj, figdir, max.cells.per.ident=200, celltype_col = 'celltype', 
+                              standardname_col = 'curatedname', n_genes = 2, min.pct = 0.25, logfc.threshold = 0.25,
+                              ...) {
 
   if (!is.element('CellID',colnames(srobj@meta.data))) {
     message('you are missing the CellID column - function will fail with confusing error message')
@@ -1159,7 +1160,7 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
   Idents(srobj) <- srobj@meta.data[[celltype_col]]
   typeobjs <- SplitSrobjOnMeta(srobj, meta=celltype_col,'typeobjects')
 
-  if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
+  if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) || is.null(figdir)) {
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
       #if only one cell state, calculate markers against all other cells
           if(length(unique(Idents(obj)))==1) {
@@ -1168,19 +1169,23 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(tmpobj@meta.data$tierNident==ident,ident,'other')
             message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
-            tmp <- FindAllMarkers(tmpobj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident) %>% 
+            tmp <- FindAllMarkers(tmpobj, 
+                                  only.pos=TRUE,
+                                  ...) %>% 
             #remove markers for all the other cells from the table
               filter(cluster!='other')
             tmp[[celltype_col]] <- type
           }
           else {
-            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+            tmp <- FindAllMarkers(obj,
+                                  only.pos=TRUE,
+                                  ...);
             tryCatch({
               tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
               }, error = function(e) {message(sprintf('standard name calculation failed for a whole clade: %s; reason: %s', celltype_col, e))})
           }
            return(tmp)})
-    write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)
+    if(!is.null(figdir)) {write.table(rbindlist(cellStateMarkers), sprintf('%s/EndClustersAmongTier1DE.csv',figdir), sep=",", row.names=F)}
   }
   else {
     cellStateMarkers <- fread(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) %>%
@@ -1263,8 +1268,8 @@ getStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_co
 #' @examples
 #' srobj <- outputStandardNames(srobj,figdir='ARBOLoutput/figs')
 #' @export
-outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype_col = 'celltype', 
-                              standardname_col = 'curatedname', n_genes = 2) {
+outputStandardNames <- function(srobj, figdir, max.cells.per.ident=200, celltype_col = 'celltype', 
+                              standardname_col = 'curatedname', n_genes = 2, min.pct = 0.25, logfc.threshold = 0.25) {
 
   if (!is.element('CellID',colnames(srobj@meta.data))) {
     message('you are missing the CellID column - function will fail with confusing error message')
@@ -1276,7 +1281,7 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
   Idents(srobj) <- srobj@meta.data[[celltype_col]]
   typeobjs <- SplitSrobjOnMeta(srobj, meta=celltype_col,'typeobjects')
 
-  if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir))) {
+  if (!file.exists(sprintf('%s/EndClustersAmongTier1DE.csv',figdir)) || is.null(figdir)) {
     cellStateMarkers <- lapply(typeobjs,function(obj) {Idents(obj) <- obj@meta.data$tierNident;
       #if only one cell state, calculate markers against all other cells
           if(length(unique(Idents(obj)))==1) {
@@ -1285,13 +1290,17 @@ outputStandardNames <- function(srobj, figdir, max_cells_per_ident=200, celltype
             tmpobj <- srobj
             Idents(tmpobj) <- ifelse(tmpobj@meta.data$tierNident==ident,ident,'other')
             message('found celltype with only one cluster. Calculating markers by wilcoxon test against all other cells')
-            tmp <- FindAllMarkers(tmpobj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25) %>% 
+            tmp <- FindAllMarkers(tmpobj,
+                                  only.pos=TRUE,
+                                  ...) %>% 
             #remove markers for all the other cells from the table
               filter(cluster!='other')
             tmp[[celltype_col]] <- type
           }
           else {
-            tmp <- FindAllMarkers(obj,only.pos=TRUE,min.pct = 0.25,logfc.threshold = 0.25, max.cells.per.ident = max_cells_per_ident);
+            tmp <- FindAllMarkers(obj,
+                                  only.pos=TRUE,
+                                  ...);
             tmp[[celltype_col]] <- unique(obj@meta.data[[celltype_col]])
           }
            return(tmp)})

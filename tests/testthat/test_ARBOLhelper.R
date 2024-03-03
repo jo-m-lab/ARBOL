@@ -1,6 +1,6 @@
 source("helper_mockObjects.R")
 library(testthat)
-# test_local here to make all ARBOL functions available to test environment. 
+# test_local here to make all ARBOL functions available to test environment.
 # testthat::test_local()
 
 test_that("ARBOLcentroidTaxonomy workflow tests\n
@@ -45,7 +45,7 @@ test_that("ARBOLcentroidTaxonomy workflow tests\n
   expect_equal(sort(unique(unlist(dataTree$Get("ids")))),
                sort(Cells(mock_seurat)))
   # make sure diversities are in end nodes
-  # and make sure they're propagated correctly
+  # and make sure they"re propagated correctly
   end_node_diversities <- diversity(mock_seurat@meta.data %>%
                              dplyr::count(sample, tierNident) %>%
                              tidyr::pivot_wider(names_from = sample,
@@ -123,7 +123,7 @@ test_that("dgcMatrix.aggregate aggregates correctly", {
   # Step 2: Define groupings
   groupings <- c(1, 2, 1, 2, 1)
   # Step 3: Select an aggregation function
-  aggregation_function <- mean # Aggregating by mean, as it's default
+  aggregation_function <- mean # Aggregating by mean, as it"s default
   # First we make sure aggregate is producing a matrix of the correct size.
   expected_rows <- length(unique(groupings))
   expected_cols <- ncol(mat)
@@ -141,7 +141,7 @@ test_that("dgcMatrix.aggregate manually calculates correctly", {
   mat <- sparseMatrix(i = i, j = j, x = values, dims = c(4, 2))
   # Define groupings (align with row indices)
   groupings <- c(1, 1, 2, 2)  # Two groups
-  # Use mean for agg fun as it's default
+  # Use mean for agg fun as it"s default
   aggregation_function <- mean  # Aggregating by mean
   # Manually calculate the expected result
   expected_values <- c(mean(c(1, 2)), mean(c(4, 5)),
@@ -163,7 +163,7 @@ test_that("getCentroids returns correct output", {
   mock_seurat <- CreateMockSeuratObject() # Create your mock Seurat object
   # Test getCentroids
   centroids <- getCentroids(srobj = mock_seurat,
-                            tree_reduction = 'pca',
+                            tree_reduction = "pca",
                             reduction_dims = 1:5,
                             centroid_method = "mean",
                             centroid_assay = "RNA",
@@ -172,7 +172,7 @@ test_that("getCentroids returns correct output", {
   expect_true(is.data.frame(centroids))
   expect_equal(dim(centroids)[1],
                dim(Embeddings(mock_seurat,
-                                 reduction = 'pca'))[2])
+                                 reduction = "pca"))[2])
   expect_equal(dim(centroids)[2],
                length(unique(mock_seurat@meta.data$tierNident)))
 
@@ -180,7 +180,26 @@ test_that("getCentroids returns correct output", {
                             tree_reduction = "centroids",
                             centroid_method = "median",
                             centroid_assay = "RNA",
-                            centroid_layer = 'scale.data',
+                            centroid_layer = "scale.data",
                             gene_list = Features(mock_seurat))
   expect_true(is.data.frame(centroids))
+})
+
+test_that("standardNames adds one name per species to srobj", {
+  # create mock seurat object with extra cells to make DE work
+  set.seed(687)
+  mock_seurat <- CreateMockSeuratObject(num_cells = 200,
+                                        num_cell_types = 6,
+                                        num_genes = 500)
+  # Test getCentroids
+  mock_seurat <- getStandardNames(mock_seurat,
+                                  figdir = NULL,
+                                  celltype_col = "celltype",
+                                  standardname_col = "standardName",
+                                  n_genes = 2,
+                                  logfc.threshold = 0,
+                                  min.pct = 0)
+  standardNames <- unique(mock_seurat@meta.data$standardName)
+  pattern <- "T[0-9]+\\.Gene[0-9]+"
+  expect_true(all(sapply(standardNames, function(x) grepl(pattern, x))))
 })
