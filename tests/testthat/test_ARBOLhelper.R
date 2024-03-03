@@ -111,6 +111,7 @@ test_that("diversityPerGroup returns diversities as expected", {
   df <- mock_seurat@meta.data
   species <- "tierNident"
   group <- "sample"
+  diversity_metric <- "simpson"
   species_sym <- rlang::sym(species)
   group_sym <- rlang::sym(group)
   

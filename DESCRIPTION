@@ -39,6 +39,8 @@ Depends:
     cluster,
     dendextend,
     scatterpie
+Imports:
+  rlang
 Remotes:
 	jo-m-lab/ARBOL,
 License: GPL

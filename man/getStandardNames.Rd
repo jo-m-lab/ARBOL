@@ -7,10 +7,13 @@
 getStandardNames(
   srobj,
   figdir,
-  max_cells_per_ident = 200,
+  max.cells.per.ident = 200,
   celltype_col = "celltype",
   standardname_col = "curatedname",
-  n_genes = 2
+  n_genes = 2,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  ...
 )
 }
 \arguments{
@@ -19,13 +22,13 @@ CellID (for preserving metadata rownames), and tierNident (i.e. srobj@meta.data$
 
 \item{figdir}{the figdir from an GenTieredClusters (ARBOL) run}
 
-\item{max_cells_per_ident}{maximum cells to use in FindAllMarkers call. defaults to 200}
-
 \item{celltype_col}{the metadata column corresponding to celltype to assign standard names}
 
 \item{standardname_col}{metadata column to which to output celltype names. defaults to 'curatedname'}
 
 \item{n_genes}{number of genes with which to create standard names. defaults to 2}
+
+\item{max_cells_per_ident}{maximum cells to use in FindAllMarkers call. defaults to 200}
 }
 \value{
 the seurat object with curatedname column in metadata

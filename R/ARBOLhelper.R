@@ -195,10 +195,10 @@ LoadTiersAsDF <- function(folder='./endclusts',maxtiers=10) {
 #' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
 #' dataframe <- dataframe %>% 
-#'              left_join(diversityPerGroup(dataframe, species=pathString, group='sample')) %>% 
+#'              left_join(diversityPerGroup(dataframe, species='pathString', group='sample')) %>% 
 #'                            suppressMessages
 #' metadata <- metadata %>% 
-#'             left_join(diversityPerGroup(metadata, species=tierNident, group='sample')) %>% 
+#'             left_join(diversityPerGroup(metadata, species='tierNident', group='sample')) %>% 
 #'                          suppressMessages
 #' @export
 diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') {
@@ -242,9 +242,9 @@ diversityPerGroup <- function(df, species, group, diversity_metric = 'simpson') 
 #' @importFrom tidyr pivot_longer pivot_wider
 #' @importFrom tibble column_to_rownames rownames_to_column
 #' @examples
-#' in a data tree
+#' # in a data tree
 #' node[[sprintf('%s_diversity',y)]] <- diversityPerIDs(metadata, group=y)
-#' directly on a dataframe
+#' # directly on a dataframe
 #' metadata$condition_diversity <- diversityPerIDs(metadata, group=condition)
 #' @export
 diversityPerIDs <- function(df, group, diversity_metric = 'simpson') {
@@ -1106,7 +1106,7 @@ tierN_diversity <- function(srobj, diversity_attributes, diversity_metric = 'sim
   srobj@meta.data <- srobj@meta.data %>% dplyr::select(-any_of(paste0(diversity_attributes, '_diversity')))
     for(z in diversity_attributes) {
         #calculate and join new diversity
-        srobj@meta.data <- srobj@meta.data %>% left_join(diversityPerGroup(srobj@meta.data, species=tierNident, group=z, diversity_metric = diversity_metric)) %>% suppressMessages
+        srobj@meta.data <- srobj@meta.data %>% left_join(diversityPerGroup(srobj@meta.data, species="tierNident", group=z, diversity_metric = diversity_metric)) %>% suppressMessages
     }
     return(srobj)
 }

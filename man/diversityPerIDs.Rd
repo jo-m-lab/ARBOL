@@ -20,8 +20,8 @@ a list of diversity per group per cell
 Calculate diversity index for a set of IDs in a dataframe
 }
 \examples{
-in a data tree
+# in a data tree
 node[[sprintf('\%s_diversity',y)]] <- diversityPerIDs(metadata, group=y)
-directly on a dataframe
+# directly on a dataframe
 metadata$condition_diversity <- diversityPerIDs(metadata, group=condition)
 }
