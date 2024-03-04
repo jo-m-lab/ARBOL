@@ -1517,9 +1517,10 @@ feature_zscore <- function(srobj, feature, assay) {
 #' 
 #' @return A sparse matrix of class "dgCMatrix".
 #' @examples
-#' vec1 <- sparseVector(c(1, 2), c(1, 2))
-#' vec2 <- sparseVector(c(3), c(2))
-#' sv.cbind(list(vec1, vec2))
+#' v1 <- Matrix::sparseVector(x = c(1,2), i = c(1,4), length = 7)
+#' v2 <- Matrix::sparseVector(x = c(3,4), i = c(2,5), length = 7) 
+#' v3 <- Matrix::sparseVector(x = c(5,6), i = c(3,6), length = 7)
+#' sv.cbind(list(v1, v2, v3))
 #' @export
 sv.cbind <- function(input_list) {
   # Length of longest input vector determines the length of the sparse matrix
@@ -1556,7 +1557,7 @@ sv.cbind <- function(input_list) {
 #' 
 #' @return A sparse matrix of class "dgCMatrix" with aggregated columns.
 #' @examples
-#' mat <- Matrix(c(1, 0, 2, 0, 0, 3), nrow = 3, sparse = TRUE)
+#' mat <- Matrix(c(1, 2, 2, 3, 5, 3), nrow = 3, sparse = TRUE)
 #' groups <- c(1, 1, 2)
 #' dgcMatrix.aggregate(mat, groups, mean)
 #' @export
@@ -1599,10 +1600,19 @@ dgcMatrix.aggregate <- function(mat, groupings, aggregation_function) {
 #' @export
 #'
 #' @examples
-#' # Assuming 'treeRoot' is the root of your tree and 'sum' is your aggregation function
-#' ARBOL.Aggregate(treeRoot, "height", sum)
+#' library(data.tree)
+#' data(acme)
+#' 
+#' # Summing 'cost' across all nodes
+#' cost_sum <- ARBOL.Aggregate(acme$root, "cost", sum)
+#' print(cost_sum)
 #'
-#' @note The 'cacheAttribute' argument is deprecated. Please use 'Do' instead.
+#' # Concatenating unique 'name' values from daughter nodes
+#' unique_names <- ARBOL.Aggregate(acme$IT, "name", function(x) paste(unique(x), collapse = ", "))
+#' print(unique_names)
+#' 
+#' @note For more information on `data.tree`, visit <https://cran.r-project.org/package=data.tree>.
+
 ARBOL.Aggregate = function(node,
                      attribute,
                      aggFun,
