@@ -357,6 +357,11 @@ subclusteringTree <- function(srobj, categories = 'sample', diversities = 'sampl
     counts = c('sample',counts)
   }
 
+  required_cols <- c("tierNident", "sample", "CellID")
+  if(!all(required_cols %in% colnames(srobj@meta.data))) {
+    stop("Missing required columns: tierNident, sample, and CellID in srobj@meta.data.")
+  }
+
   srobj <- suppressMessages(tierN_diversity(srobj, diversity_attributes = diversities,
                                             diversity_metric = diversity_metric))
   
@@ -682,6 +687,11 @@ ARBOLcentroidTaxonomy <- function(srobj, categories = 'sample', diversities = 's
   if (!is.element('sample',counts)) {
     counts = c('sample',counts)
   }
+
+  required_cols <- c("tierNident", "sample", "CellID")
+  if(!all(required_cols %in% colnames(srobj@meta.data))) {
+    stop("Missing required columns: tierNident, sample, and CellID in srobj@meta.data.")
+  }
   
   srobj <- centroidTaxonomy(srobj = srobj, tree_reduction = tree_reduction, hclust_method = hclust_method,
                           distance_method = distance_method, centroid_method = centroid_method, centroid_assay = centroid_assay, 
@@ -833,6 +843,11 @@ data.tree_to_ggraph <- function(data.tree, categories, diversities, counts, tota
 #' @importFrom tibble column_to_rownames rownames_to_column
 #' @export 
 treeAllotment <- function(srobj, treedf, categories, diversities, diversity_metric, counts, totals) {
+  required_cols <- c("tierNident", "sample", "CellID")
+  if(!all(required_cols %in% colnames(srobj@meta.data))) {
+    stop("Missing required columns: tierNident, sample, and CellID in srobj@meta.data.")
+  }
+
   srobj <- tierN_diversity(srobj, diversity_attributes = diversities, diversity_metric = diversity_metric)
 
   jointb <- srobj@meta.data %>% group_by(tierNident) %>% mutate(n=n()) %>% 

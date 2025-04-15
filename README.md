@@ -62,6 +62,9 @@ tiers <- ARBOL(srobj,
                            SaveEndNamesDir = "~/tieredoutput/endclusts")
 ```
 
+Harmony can be used for integration during each clustering step. This is done automatically when
+*harmony_var* is specified. *harmony_var* is the covariate to pass to Harmony over which to integrate.
+
 **Note** ARBOL() can take a long time to run. Running on 20K cells could 
 take a few hours on a low-power machine. Running on 100k+ cells could take over a day. This timing varies
 based on the heterogeneity of your data. 

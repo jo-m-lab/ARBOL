@@ -7,7 +7,7 @@ CreateMockSeuratObject <- function(num_cells = 20,
     library(Seurat)
     library(dplyr)
     library(Matrix)
-    # Simulate some data
+    # Simulate some counts matrix data
     data <- Matrix(sample(0:500, num_genes * num_cells, replace = TRUE),
                    nrow = num_genes,
                    ncol = num_cells,
@@ -18,7 +18,7 @@ CreateMockSeuratObject <- function(num_cells = 20,
     # Create a basic Seurat object
     mock_seurat <- CreateSeuratObject(counts = data)
 
-    # Generate metadata
+    # Simulate basic metadata with 3 ARBOL columns: CellID, tierNident, sample
     metadata <- data.frame(
       CellID = colnames(data),
       tierNident = sample(paste0("Type", 1:num_cell_types),
@@ -36,15 +36,15 @@ CreateMockSeuratObject <- function(num_cells = 20,
       row.names = colnames(data)
     )
 
-    # Add necessary metadata
+    # Add metadata to seurat object
     mock_seurat <- AddMetaData(mock_seurat, metadata = metadata)
 
-    # Create overarching cell type for standardNames
+    # Simulate 2 cell type lineages (e.g. immune or stroma) for reference frames / tree plots.
     tierNidents <- unique(metadata$tierNident)
     half_index <- ceiling(length(tierNidents) / 2)
     group1 <- tierNidents[1:half_index]
     group2 <- tierNidents[(half_index + 1):length(tierNidents)] # Second half
-    # Assign celltypes
+    # Assign lineages to seurat object
     ctdf <- data.frame(tierNident = tierNidents)
     ctdf$celltype <- ifelse(ctdf$tierNident %in% group1, "T1", "T2")
     ctdf <- metadata %>% left_join(ctdf, by = "tierNident")
