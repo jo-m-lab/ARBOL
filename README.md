@@ -57,6 +57,7 @@ The subclustering function of ARBOL is ARBOL() - here is an example call
 ```
 srobj <- readRDS("/path/to/full_seurat_object.rds")
 tiers <- ARBOL(srobj,
+                           harmony_var = c("batch", "disease"), # batch correction with Harmony 
                            saveSROBJdir = "~/tieredoutput/srobjs",
                            figdir = "~/tieredoutput/figdir",
                            SaveEndNamesDir = "~/tieredoutput/endclusts")
